@@ -1,0 +1,16 @@
+machines:
+    type: hardcode
+    ip :
+        - 192.153.22.32
+        - 192.153.22.33
+        - 192.153.22.34
+containers:
+    django:
+        quantity : 1
+        granularity : machine
+    postgresql:
+        quantity : 1
+        mode : single
+    fileserver:
+        quantity : 1
+        mode : single
