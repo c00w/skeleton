@@ -9,4 +9,9 @@ bin/orchestrator: src/orchestrator/*
 
 all: bin/shipper bin/security bin/orchestrator
 
-.PHONY: all
+dependencies: goyaml
+
+goyaml:
+	go get launchpad.net/goyaml
+
+.PHONY: all goyaml dependencies
