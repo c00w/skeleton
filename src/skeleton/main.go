@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-    config, err := ioutil.ReadFile("shipperFile")
+    config, err := ioutil.ReadFile("bonesFile")
 
     if err != nil {
         log.Fatal(err)

@@ -1,7 +1,7 @@
-shipper
+skeleton
 =======
 
-# What is shipper?
+# What is skeleton?
 
 Shipper manages the difficult task of deploying your software to the cloud.
 It's initial goals are to take your software packaged using docker and
@@ -16,7 +16,7 @@ or look at the examples
 
 # Architecture Overview
 
-There are three main components in shipper
+There are three main components in skeleton
 
 1. The Orchestration Server
 2. The Secret Server
@@ -37,5 +37,5 @@ functions, or the built in api
 
 Everyone needs a database. There's no reason to have five different versions
 of postgresql that are all compatible with the secret server. For this reason
-shipper ships with several databases. If you don't see yours, add a pull
+skeleton ships with several databases. If you don't see yours, add a pull
 request

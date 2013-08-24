@@ -1,5 +1,5 @@
-bin/shipper: src/shipper/*
-	GOPATH=$(CURDIR) go install shipper
+bin/skeleton: src/skeleton/*
+	GOPATH=$(CURDIR) go install skeleton
 
 bin/security: src/security/*
 	GOPATH=$(CURDIR) go install security
@@ -7,7 +7,7 @@ bin/security: src/security/*
 bin/orchestrator: src/orchestrator/*
 	GOPATH=$(CURDIR) go install orchestrator
 
-all: bin/shipper bin/security bin/orchestrator
+all: bin/skeleton bin/security bin/orchestrator
 
 dependencies: goyaml
 
