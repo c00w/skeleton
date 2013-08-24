@@ -1,6 +1,18 @@
 package main
 
-import ()
+import (
+    "fmt"
+    "log"
+    "io/ioutil"
+)
 
-func main () {
+func main() {
+    config, err := ioutil.ReadFile("shipperFile")
+
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf(string(config))
+
 }
