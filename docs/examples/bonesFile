@@ -1,4 +1,5 @@
 {
+    "test":"test",
     "machines": {
         "provider": "hardcode",
         "ip": [
@@ -11,11 +12,11 @@
         "django": {
             "quantity" : 1,
             "granularity" : "machine"
-        }
+        },
         "postgresql": {
             "quantity": 1,
             "mode": "single"
-        }
+        },
         "fileserver": {
             "quantity": 1,
             "mode": "single"

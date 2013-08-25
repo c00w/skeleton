@@ -8,24 +8,25 @@ import (
 )
 
 type Container struct {
-    quantity int
-    mode string
-    granularity string
+    Quantity int
+    Mode string
+    Granularity string
 }
 
 type MachineType struct {
-    provider string
-    ip []string
+    Provider string
+    Ip []string
 }
 
 type SkeletonDeployment struct {
-    machines MachineType
-    containers []Container
+    Test string
+    Machines MachineType
+    Containers map[string]Container
 }
 
-func main() {
-    config, err := os.Open("bonesFile")
+func loadBonesFile() *SkeletonDeployment {
 
+    config, err := os.Open("bonesFile")
     if err != nil {
         log.Fatal(err)
     }
@@ -35,8 +36,32 @@ func main() {
         log.Fatal(err)
     }
 
-    var deploy SkeletonDeployment
+    deploy := new(SkeletonDeployment)
 
-    json.Unmarshal(configslice, deploy)
+    err = json.Unmarshal(configslice, deploy)
+    if err != nil {
+        log.Fatal(err)
+    }
 
+    for k,v := range deploy.Containers {
+        if len(v.Granularity) == 0 {
+            v.Granularity = "deployment"
+            deploy.Containers[k] = v
+        }
+        if len(v.Mode) == 0 {
+            v.Mode = "default"
+            deploy.Containers[k] = v
+        }
+    }
+
+    if len(deploy.Machines.Provider) == 0 {
+        log.Fatal("Machine Provider must be specified")
+    }
+
+    return deploy
+}
+
+func main() {
+    _ = loadBonesFile()
+    log.Print("bonesFile Parsed")
 }
