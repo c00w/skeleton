@@ -9,9 +9,7 @@ bin/orchestrator: src/orchestrator/*
 
 all: bin/skeleton bin/security bin/orchestrator
 
-dependencies: goyaml
+test: all
+	GOPATH=$(CURDIR) go test skeleton security orchestrator
 
-goyaml:
-	go get launchpad.net/goyaml
-
-.PHONY: all goyaml dependencies
+.PHONY: all goyaml dependencies test
