@@ -35,7 +35,7 @@ func (t *NoOrchestratorFound) Error() string {
 }
 
 func loadBonesFile() *SkeletonDeployment {
-	log.Print("parsing configuration file")
+	log.Print("Loading bonesFile")
 	config, err := os.Open("bonesFile")
 	if err != nil {
 		log.Fatal(err)
@@ -68,7 +68,7 @@ func loadBonesFile() *SkeletonDeployment {
 		log.Fatal("Machine Provider must be specified")
 	}
 
-	log.Print("Configuration parsed")
+	log.Print("bonesFile loaded")
 	return deploy
 }
 
@@ -113,7 +113,6 @@ func deploy(orchestratorip string) {
 func main() {
 
 	config := loadBonesFile()
-	log.Print("bonesFile Parsed")
 
 	orch, err := findOrchestrator(config)
 	switch err.(type) {
