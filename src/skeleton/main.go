@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
-    "net/http"
+	"net/http"
 	"os"
 )
 
@@ -25,10 +25,10 @@ type SkeletonDeployment struct {
 	Containers map[string]Container
 }
 
-type NoOrchestratorFound struct {}
+type NoOrchestratorFound struct{}
 
 func (t *NoOrchestratorFound) Error() string {
-    return "No Orchestrator Found"
+	return "No Orchestrator Found"
 }
 
 func loadBonesFile() *SkeletonDeployment {
@@ -68,51 +68,51 @@ func loadBonesFile() *SkeletonDeployment {
 	return deploy
 }
 
-func makeHttpClient () *http.Client {
-    return &http.Client{}
+func makeHttpClient() *http.Client {
+	return &http.Client{}
 }
 
 func findOrchestrator(config *SkeletonDeployment) (string, error) {
-    client := makeHttpClient()
-    for _,v := range config.Machines.Ip {
-        _, err := client.Get("http://" + v + ":900:/version") 
-        if err == nil {
-            return v, nil
-        }
-    }
+	client := makeHttpClient()
+	for _, v := range config.Machines.Ip {
+		_, err := client.Get("http://" + v + ":900:/version")
+		if err == nil {
+			return v, nil
+		}
+	}
 
-    return "", new(NoOrchestratorFound)
+	return "", new(NoOrchestratorFound)
 }
 
-func bootstrapOrchestrator() string{
-    return ""
+func bootstrapOrchestrator() string {
+	return ""
 
 }
 
 func deploy(orchestratorip string) {
-    return
+	return
 
 }
 
 func main() {
 
-    config := loadBonesFile()
+	config := loadBonesFile()
 	log.Print("bonesFile Parsed")
 
-    orch, err := findOrchestrator(config)
-    switch err.(type) {
+	orch, err := findOrchestrator(config)
+	switch err.(type) {
 
-    // Initial Setup
-    case *NoOrchestratorFound:
-        orch = bootstrapOrchestrator()
-        deploy(orch)
+	// Initial Setup
+	case *NoOrchestratorFound:
+		orch = bootstrapOrchestrator()
+		deploy(orch)
 
-    // Update Deploy
-    case nil:
-        deploy(orch)
+	// Update Deploy
+	case nil:
+		deploy(orch)
 
-    // Error contacting orchestrator
-    default:
-        log.Fatal(err)
-    }
+	// Error contacting orchestrator
+	default:
+		log.Fatal(err)
+	}
 }
