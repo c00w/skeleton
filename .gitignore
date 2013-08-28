@@ -1,6 +1,7 @@
 # Our stuff
 bin
 pkg
+src/code.google.com/
 
 # Github default
 # Compiled Object files, Static and Dynamic libs (Shared Objects)

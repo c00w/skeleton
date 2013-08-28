@@ -1,11 +1,14 @@
 package main
 
 import (
+	"code.google.com/p/go.crypto/ssh"
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"time"
 )
 
 type Container struct {
@@ -32,7 +35,7 @@ func (t *NoOrchestratorFound) Error() string {
 }
 
 func loadBonesFile() *SkeletonDeployment {
-
+	log.Print("parsing configuration file")
 	config, err := os.Open("bonesFile")
 	if err != nil {
 		log.Fatal(err)
@@ -65,6 +68,7 @@ func loadBonesFile() *SkeletonDeployment {
 		log.Fatal("Machine Provider must be specified")
 	}
 
+	log.Print("Configuration parsed")
 	return deploy
 }
 
@@ -73,18 +77,30 @@ func makeHttpClient() *http.Client {
 }
 
 func findOrchestrator(config *SkeletonDeployment) (string, error) {
+	log.Print("Finding orchestrator")
 	client := makeHttpClient()
 	for _, v := range config.Machines.Ip {
-		_, err := client.Get("http://" + v + ":900:/version")
+		_, err := net.DialTimeout("tcp", "v"+":900", 100*time.Millisecond)
+		if err != nil {
+			continue
+		}
+		_, err = client.Get("http://" + v + ":900:/version")
 		if err == nil {
+			log.Print("Orchestrator Found")
 			return v, nil
 		}
 	}
 
+	log.Print("No Orchestrator Found")
 	return "", new(NoOrchestratorFound)
 }
 
-func bootstrapOrchestrator() string {
+func bootstrapOrchestrator(ip string) string {
+	c, err := net.DialTimeout("tcp", ip+":22", 100*time.Millisecond)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, _ = ssh.Client(c, nil)
 	return ""
 
 }
@@ -104,7 +120,7 @@ func main() {
 
 	// Initial Setup
 	case *NoOrchestratorFound:
-		orch = bootstrapOrchestrator()
+		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		deploy(orch)
 
 	// Update Deploy

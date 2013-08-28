@@ -12,8 +12,9 @@ func TestBonesLoading(t *testing.T) {
 		t.Error(err)
 	}
 	cmd := exec.Command(os.Getenv("GOPATH") + "/bin/skeleton")
-	err = cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
+		t.Log(string(out))
 		t.Error(err)
 	}
 }
