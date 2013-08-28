@@ -3,6 +3,7 @@ package main
 import (
 	"code.google.com/p/go.crypto/ssh"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -95,19 +96,41 @@ func findOrchestrator(config *SkeletonDeployment) (string, error) {
 	return "", new(NoOrchestratorFound)
 }
 
+type passwordShell struct{}
+
+func (p *passwordShell) Password(user string) (password string, err error) {
+
+	fmt.Printf("Password: ")
+	_, err = fmt.Scanln(&password)
+	return password, err
+}
+
 func bootstrapOrchestrator(ip string) string {
-	c, err := net.DialTimeout("tcp", ip+":22", 100*time.Millisecond)
+	log.Print("Bootstrapping Orchestrator")
+
+	fmt.Printf("Username: ")
+	var username string
+	_, err := fmt.Scanln(&username)
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, _ = ssh.Client(c, nil)
+
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.ClientAuth{
+			ssh.ClientAuthPassword(&passwordShell{}),
+		},
+	}
+	_, err = ssh.Dial("tcp", ip+":22", config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return ""
 
 }
 
 func deploy(orchestratorip string) {
 	return
-
 }
 
 func main() {

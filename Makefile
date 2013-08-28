@@ -12,7 +12,10 @@ bin/security: src/security/*
 bin/orchestrator: src/orchestrator/*
 	GOPATH=$(CURDIR) go install orchestrator
 
-test: all
+vagrant:
+	VAGRANT_CWD=$(CURDIR)/test vagrant up
+
+test: all vagrant
 	GOPATH=$(CURDIR) go test skeleton security orchestrator
 
-.PHONY: all test ssh
+.PHONY: all test ssh vagrant

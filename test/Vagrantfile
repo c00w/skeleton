@@ -1,0 +1,43 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+    #Waiting for next vagrant version
+    #config.vm.box_url = "http://storage.core-os.net/coreos/amd64-generic/dev-channel/coreo"
+    #config.vm.box = "coreos"
+    #
+    config.vm.box_url = "http://puppet-vagrant-boxes.puppetlabs.com/ubuntu-server-12042-x64-vbox4210-nocm.box"
+    config.vm.box = "ubuntu-server-12042-x64-vbox4210-nocm.box"
+
+    config.vm.provision :shell, :inline => "
+    sudo sh -c \"curl https://get.docker.io/gpg | apt-key add -\"
+    sudo sh -c \"echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list\"
+    sudo apt-get update
+    sudo apt-get install lxc-docker -y
+    "
+
+    config.vm.define :b1 do |b1|
+        config.vm.hostname = "b1"
+        config.vm.network :private_network, ip: "192.168.22.32"
+    end
+
+    config.vm.define :b2 do |b2|
+        config.vm.hostname = "b2"
+        config.vm.network :private_network, ip: "192.168.22.33"
+    end
+
+    config.vm.define :b3 do |b3|
+        config.vm.hostname = "b3"
+        config.vm.network :private_network, ip: "192.168.22.34"
+    end
+
+    config.vm.define :b4 do |b4|
+        config.vm.hostname = "b4"
+        config.vm.network :private_network, ip: "192.168.22.35"
+    end
+
+end

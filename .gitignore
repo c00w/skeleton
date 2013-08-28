@@ -2,6 +2,7 @@
 bin
 pkg
 src/code.google.com/
+*.vagrant
 
 # Github default
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
