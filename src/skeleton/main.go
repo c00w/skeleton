@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"code.google.com/p/go.crypto/ssh"
 	"encoding/json"
 	"fmt"
@@ -132,10 +133,29 @@ func sshClient(ip string) *ssh.ClientConn {
 	return c
 }
 
+func loopPrint(b *bytes.Buffer, c chan int) {
+	for {
+		timeout := time.After(50 * time.Millisecond)
+		select {
+		case _ = <-timeout:
+			timeout = time.After(50 * time.Millisecond)
+			for {
+				l, _ := b.ReadString('\n')
+				if len(l) == 0 {
+					break
+				}
+				log.Print(l)
+			}
+		case _ = <-c:
+			return
+		}
+	}
+}
+
 // setupRegistry sets up a locally hosted docker registry on a machine
 // mainly intended for bootstrapping the orchestrator
 func setupRegistry(ip string) {
-	log.Print("Setting up registry")
+	log.Printf("Setting up registry on %s", ip)
 
 	c := sshClient(ip)
 
@@ -145,14 +165,22 @@ func setupRegistry(ip string) {
 	}
 	defer s.Close()
 
-	b, err := s.CombinedOutput("/usr/bin/sudo /usr/bin/docker run samalba/docker-registry")
+	log.Print("Connection Opened")
+
+	var b1 bytes.Buffer
+	var b2 bytes.Buffer
+	cq := make(chan int)
+	s.Stdout = &b1
+	s.Stderr = &b2
+	go loopPrint(&b1, cq)
+	go loopPrint(&b2, cq)
+	err = s.Run("/usr/bin/sudo /usr/bin/docker run -d samalba/docker-registry")
+	time.Sleep(60)
 	if err != nil {
-		log.Print(string(b))
 		log.Fatal(err)
 	}
 
 	log.Print("registry setup")
-
 }
 
 // bootstrapOrchestrator starts up the orchestrator on a machine
