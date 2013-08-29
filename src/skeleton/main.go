@@ -35,6 +35,8 @@ func (t *NoOrchestratorFound) Error() string {
 	return "No Orchestrator Found"
 }
 
+// loadBonesFile does initial bones file loading and does some quick and dirty
+// data sanitization
 func loadBonesFile() *SkeletonDeployment {
 	log.Print("Loading bonesFile")
 	config, err := os.Open("bonesFile")
@@ -77,6 +79,8 @@ func makeHttpClient() *http.Client {
 	return &http.Client{}
 }
 
+// findOrchestrator finds a running orchestrator by scanning port 900 on all
+// machines it knows about
 func findOrchestrator(config *SkeletonDeployment) (string, error) {
 	log.Print("Finding orchestrator")
 	client := makeHttpClient()
@@ -96,6 +100,7 @@ func findOrchestrator(config *SkeletonDeployment) (string, error) {
 	return "", new(NoOrchestratorFound)
 }
 
+// passwordShell is a quick and dirty way to prompt a user for a password
 type passwordShell struct{}
 
 func (p *passwordShell) Password(user string) (password string, err error) {
@@ -105,9 +110,8 @@ func (p *passwordShell) Password(user string) (password string, err error) {
 	return password, err
 }
 
-func bootstrapOrchestrator(ip string) string {
-	log.Print("Bootstrapping Orchestrator")
-
+// sshClient is a quick and dirty function to get a ssh client to a ip address
+func sshClient(ip string) *ssh.ClientConn {
 	fmt.Printf("Username: ")
 	var username string
 	_, err := fmt.Scanln(&username)
@@ -121,14 +125,45 @@ func bootstrapOrchestrator(ip string) string {
 			ssh.ClientAuthPassword(&passwordShell{}),
 		},
 	}
-	_, err = ssh.Dial("tcp", ip+":22", config)
+	c, err := ssh.Dial("tcp", ip+":22", config)
 	if err != nil {
 		log.Fatal(err)
 	}
+	return c
+}
+
+// setupRegistry sets up a locally hosted docker registry on a machine
+// mainly intended for bootstrapping the orchestrator
+func setupRegistry(ip string) {
+	log.Print("Setting up registry")
+
+	c := sshClient(ip)
+
+	s, err := c.NewSession()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer s.Close()
+
+	b, err := s.CombinedOutput("/usr/bin/sudo /usr/bin/docker run samalba/docker-registry")
+	if err != nil {
+		log.Print(string(b))
+		log.Fatal(err)
+	}
+
+	log.Print("registry setup")
+
+}
+
+// bootstrapOrchestrator starts up the orchestrator on a machine
+func bootstrapOrchestrator(ip string) string {
+	log.Print("Bootstrapping Orchestrator")
+	_ = sshClient(ip)
 	return ""
 
 }
 
+// deploy pushes our new deploy configuration to the orchestrator
 func deploy(orchestratorip string) {
 	return
 }
@@ -142,6 +177,7 @@ func main() {
 
 	// Initial Setup
 	case *NoOrchestratorFound:
+		setupRegistry(config.Machines.Ip[0])
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		deploy(orch)
 
