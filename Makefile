@@ -1,9 +1,6 @@
 all: bin/skeleton bin/security bin/orchestrator
 
-ssh:
-	GOPATH=$(CURDIR) go get -u code.google.com/p/go.crypto/ssh
-
-bin/skeleton: src/skeleton/* ssh
+bin/skeleton: src/skeleton/*
 	GOPATH=$(CURDIR) go install skeleton
 
 bin/security: src/security/*
@@ -18,4 +15,4 @@ vagrant:
 test: all vagrant
 	GOPATH=$(CURDIR) go test skeleton security orchestrator
 
-.PHONY: all test ssh vagrant
+.PHONY: all test vagrant
