@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"code.google.com/p/go.crypto/ssh"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -101,84 +99,10 @@ func findOrchestrator(config *SkeletonDeployment) (string, error) {
 	return "", new(NoOrchestratorFound)
 }
 
-// passwordShell is a quick and dirty way to prompt a user for a password
-type passwordShell struct{}
-
-func (p *passwordShell) Password(user string) (password string, err error) {
-
-	fmt.Printf("Password: ")
-	_, err = fmt.Scanln(&password)
-	return password, err
-}
-
-// sshClient is a quick and dirty function to get a ssh client to a ip address
-func sshClient(ip string) *ssh.ClientConn {
-	fmt.Printf("Username: ")
-	var username string
-	_, err := fmt.Scanln(&username)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.ClientAuth{
-			ssh.ClientAuthPassword(&passwordShell{}),
-		},
-	}
-	c, err := ssh.Dial("tcp", ip+":22", config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return c
-}
-
-func loopPrint(b *bytes.Buffer, c chan int) {
-	for {
-		timeout := time.After(50 * time.Millisecond)
-		select {
-		case _ = <-timeout:
-			timeout = time.After(50 * time.Millisecond)
-			for {
-				l, _ := b.ReadString('\n')
-				if len(l) == 0 {
-					break
-				}
-				log.Print(l)
-			}
-		case _ = <-c:
-			return
-		}
-	}
-}
-
 // setupRegistry sets up a locally hosted docker registry on a machine
 // mainly intended for bootstrapping the orchestrator
 func setupRegistry(ip string) {
 	log.Printf("Setting up registry on %s", ip)
-
-	c := sshClient(ip)
-
-	s, err := c.NewSession()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer s.Close()
-
-	log.Print("Connection Opened")
-
-	var b1 bytes.Buffer
-	var b2 bytes.Buffer
-	cq := make(chan int)
-	s.Stdout = &b1
-	s.Stderr = &b2
-	go loopPrint(&b1, cq)
-	go loopPrint(&b2, cq)
-	err = s.Run("/usr/bin/sudo /usr/bin/docker run -d samalba/docker-registry")
-	time.Sleep(60)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	log.Print("registry setup")
 }
@@ -186,7 +110,6 @@ func setupRegistry(ip string) {
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
-	_ = sshClient(ip)
 	return ""
 
 }
