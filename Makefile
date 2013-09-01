@@ -3,7 +3,7 @@ all: bin/skeleton bin/security bin/orchestrator containers/orchestrator.tar.gz
 containers/orchestrator/orchestrator: bin/orchestrator
 	cp bin/orchestrator containers/orchestrator/orchestrator
 
-containers/orchestrator.tar.gz: containers/orchestrator/orchestrator
+containers/orchestrator.tar.gz: containers/orchestrator/orchestrator containers/orchestrator/*
 	tar -cvf containers/orchestrator.tar.gz -C containers/orchestrator $(shell ls containers/orchestrator)
 
 bin/skeleton: src/skeleton/*
