@@ -118,6 +118,10 @@ func setupRegistry(ip string) {
 	log.Print("registry setup")
 }
 
+type idDump struct {
+	Id string
+}
+
 func runContainer(ip string, image string) {
 	h := makeHttpClient()
 	b := bytes.NewBuffer([]byte("{\"Image\":\"" + image + "\"}"))
@@ -127,10 +131,26 @@ func runContainer(ip string, image string) {
 
 	s, _ := ioutil.ReadAll(resp.Body)
 	log.Print(string(s))
+	log.Print(resp.Status)
 
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	a := new(idDump)
+	json.Unmarshal(s, a)
+	id := a.Id
+
+	log.Print(a)
+	log.Print(id)
+
+	b = bytes.NewBuffer([]byte("{}"))
+	resp, err = h.Post("http://"+ip+":4243/containers/"+id+"/start", "application/json", b)
+	defer resp.Body.Close()
+
+	logReader(resp.Body)
+	log.Print(resp.Status)
+
 }
 
 func loadImage(ip string, image string) {
@@ -141,6 +161,7 @@ func loadImage(ip string, image string) {
 	defer resp.Body.Close()
 
 	logReader(resp.Body)
+	log.Print(resp.Status)
 
 	if err != nil {
 		log.Fatal(err)
