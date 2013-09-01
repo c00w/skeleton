@@ -4,7 +4,7 @@ containers/orchestrator/orchestrator: bin/orchestrator
 	cp bin/orchestrator containers/orchestrator/orchestrator
 
 containers/orchestrator.tar.gz: containers/orchestrator/orchestrator
-	tar -cvf containers/orchestrator.tar.gz containers/orchestrator
+	tar -cvf containers/orchestrator.tar.gz -C containers/orchestrator $(shell ls containers/orchestrator)
 
 bin/skeleton: src/skeleton/*
 	GOPATH=$(CURDIR) go install skeleton

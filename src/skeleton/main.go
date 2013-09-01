@@ -150,7 +150,9 @@ func runContainer(ip string, image string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 204 {
-		log.Fatal("start status code is not 204")
+		logReader(resp.Body)
+		log.Fatal("start status code is not 204 it is %i", resp.StatusCode)
+
 	}
 
 	log.Printf("Container running")
@@ -196,7 +198,8 @@ func loadImage(ip string, image string) {
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
-
+	buildImage(ip, "../../containers/orchestrator.tar.gz", "orchestrator")
+	runContainer(ip, "orchestrator")
 	return ""
 
 }
