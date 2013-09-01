@@ -122,6 +122,7 @@ type idDump struct {
 	Id string
 }
 
+// runContainer takes a ip and a docker image to run, and makes sure it is running
 func runContainer(ip string, image string) {
 	h := makeHttpClient()
 	b := bytes.NewBuffer([]byte("{\"Image\":\"" + image + "\"}"))
@@ -130,8 +131,9 @@ func runContainer(ip string, image string) {
 	defer resp.Body.Close()
 
 	s, _ := ioutil.ReadAll(resp.Body)
-	log.Print(string(s))
-	log.Print(resp.Status)
+	if resp.StatusCode != 201 {
+		log.Fatal("response status code not 201")
+	}
 
 	if err != nil {
 		log.Fatal(err)
@@ -141,18 +143,36 @@ func runContainer(ip string, image string) {
 	json.Unmarshal(s, a)
 	id := a.Id
 
-	log.Print(a)
-	log.Print(id)
+	log.Printf("Container created id:%s", id)
 
 	b = bytes.NewBuffer([]byte("{}"))
 	resp, err = h.Post("http://"+ip+":4243/containers/"+id+"/start", "application/json", b)
 	defer resp.Body.Close()
 
-	logReader(resp.Body)
-	log.Print(resp.Status)
+	if resp.StatusCode != 204 {
+		log.Fatal("start status code is not 204")
+	}
+
+	log.Printf("Container running")
 
 }
 
+// buildImage takes a tarpath, and builds it
+func buildImage(ip string, tarpath string, name string) {
+	fd, err := os.Open(tarpath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	h := makeHttpClient()
+	resp, err := h.Post("http://"+ip+":4243/build?t="+name, "application/tar", fd)
+	defer resp.Body.Close()
+
+	logReader(resp.Body)
+	log.Print(resp.StatusCode)
+}
+
+// loadImage pulls a specified image into a docker instance
 func loadImage(ip string, image string) {
 	h := makeHttpClient()
 	b := bytes.NewBuffer(nil)
@@ -161,16 +181,22 @@ func loadImage(ip string, image string) {
 	defer resp.Body.Close()
 
 	logReader(resp.Body)
-	log.Print(resp.Status)
 
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if resp.StatusCode != 200 {
+		log.Printf("create status code is not 200 %s", resp.StatusCode)
+	}
+
+	log.Printf("Image fetched %s", image)
 }
 
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
+
 	return ""
 
 }

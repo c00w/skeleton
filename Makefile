@@ -1,4 +1,10 @@
-all: bin/skeleton bin/security bin/orchestrator
+all: bin/skeleton bin/security bin/orchestrator containers/orchestrator.tar.gz
+
+containers/orchestrator/orchestrator: bin/orchestrator
+	cp bin/orchestrator containers/orchestrator/orchestrator
+
+containers/orchestrator.tar.gz: containers/orchestrator/orchestrator
+	tar -cvf containers/orchestrator.tar.gz containers/orchestrator
 
 bin/skeleton: src/skeleton/*
 	GOPATH=$(CURDIR) go install skeleton
