@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -98,12 +100,51 @@ func findOrchestrator(config *SkeletonDeployment) (string, error) {
 	return "", new(NoOrchestratorFound)
 }
 
+func logReader(r io.Reader) {
+	buff := make([]byte, 1024)
+	for _, err := r.Read(buff); err == nil; _, err = r.Read(buff) {
+		log.Print(string(buff))
+	}
+}
+
 // setupRegistry sets up a locally hosted docker registry on a machine
 // mainly intended for bootstrapping the orchestrator
 func setupRegistry(ip string) {
 	log.Printf("Setting up registry on %s", ip)
 
+	loadImage(ip, "samalba/docker-registry")
+	runContainer(ip, "samalba/docker-registry")
+
 	log.Print("registry setup")
+}
+
+func runContainer(ip string, image string) {
+	h := makeHttpClient()
+	b := bytes.NewBuffer([]byte("{\"Image\":\"" + image + "\"}"))
+	resp, err := h.Post("http://"+ip+":4243/containers/create",
+		"application/json", b)
+	defer resp.Body.Close()
+
+	s, _ := ioutil.ReadAll(resp.Body)
+	log.Print(string(s))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func loadImage(ip string, image string) {
+	h := makeHttpClient()
+	b := bytes.NewBuffer(nil)
+	resp, err := h.Post("http://"+ip+":4243/images/create?fromImage="+image,
+		"text", b)
+	defer resp.Body.Close()
+
+	logReader(resp.Body)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // bootstrapOrchestrator starts up the orchestrator on a machine

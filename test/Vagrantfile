@@ -14,15 +14,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.vm.box = "ubuntu-server-12042-x64-vbox4210-nocm.box"
 
     config.vm.provision :shell, :inline => "
-    sudo sh -c \"curl https://get.docker.io/gpg | apt-key add -\"
-    sudo sh -c \"echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list\"
-    sudo apt-get update
-    sudo apt-get install lxc-docker -y
-    sudo sed -i 's/docker -d/docker -d -H=tcp:\\/\\/0.0.0.0/g' /etc/init/docker.conf
-    sudo stop docker
+    sh -c \"curl https://get.docker.io/gpg | apt-key add -\"
+    sh -c \"echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list\"
+    apt-get update
+    apt-get install lxc-docker -y
+    sed -i 's/docker -d/docker -d -H=tcp:\\/\\/0.0.0.0/g' /etc/init/docker.conf
+    stop docker
     initctl reload docker
-    sudo start docker
-    whoami
+    start docker
     "
 
     config.vm.define :b1 do |b1|
