@@ -107,17 +107,6 @@ func logReader(r io.Reader) {
 	}
 }
 
-// setupRegistry sets up a locally hosted docker registry on a machine
-// mainly intended for bootstrapping the orchestrator
-func setupRegistry(ip string) {
-	log.Printf("Setting up registry on %s", ip)
-
-	loadImage(ip, "samalba/docker-registry")
-	runContainer(ip, "samalba/docker-registry")
-
-	log.Print("registry setup")
-}
-
 type idDump struct {
 	Id string
 }
@@ -168,6 +157,11 @@ func buildImage(ip string, tarpath string, name string) {
 
 	h := makeHttpClient()
 	resp, err := h.Post("http://"+ip+":4243/build?t="+name, "application/tar", fd)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	defer resp.Body.Close()
 
 	logReader(resp.Body)
@@ -180,14 +174,12 @@ func loadImage(ip string, image string) {
 	b := bytes.NewBuffer(nil)
 	resp, err := h.Post("http://"+ip+":4243/images/create?fromImage="+image,
 		"text", b)
-	defer resp.Body.Close()
-
-	logReader(resp.Body)
-
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer resp.Body.Close()
 
+	logReader(resp.Body)
 	if resp.StatusCode != 200 {
 		log.Printf("create status code is not 200 %s", resp.StatusCode)
 	}
@@ -200,12 +192,30 @@ func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	buildImage(ip, "../../containers/orchestrator.tar.gz", "orchestrator")
 	runContainer(ip, "orchestrator")
-	return ""
-
+	log.Print("Orchestrator bootstrapped")
+	return ip
 }
 
 // deploy pushes our new deploy configuration to the orchestrator
-func deploy(orchestratorip string) {
+func deploy(ip string, config *SkeletonDeployment) {
+	h := makeHttpClient()
+	barr, err := json.Marshal(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b := bytes.NewBuffer(barr)
+
+	resp, err := h.Post("http://"+ip+"/deploy", "application/json", b)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
+
+	logReader(resp.Body)
+
 	return
 }
 
@@ -218,13 +228,12 @@ func main() {
 
 	// Initial Setup
 	case *NoOrchestratorFound:
-		setupRegistry(config.Machines.Ip[0])
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
-		deploy(orch)
+		deploy(orch, config)
 
 	// Update Deploy
 	case nil:
-		deploy(orch)
+		deploy(orch, config)
 
 	// Error contacting orchestrator
 	default:
