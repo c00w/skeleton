@@ -24,7 +24,6 @@ type MachineType struct {
 }
 
 type SkeletonDeployment struct {
-	Test       string
 	Machines   MachineType
 	Containers map[string]Container
 }
