@@ -21,4 +21,6 @@ vagrant:
 test: all vagrant
 	GOPATH=$(CURDIR) go test skeleton security orchestrator
 
+clean:
+	VAGRANT_CWD=$(CURDIR)/test vagrant destroy -f
 .PHONY: all test vagrant
