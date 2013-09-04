@@ -25,23 +25,23 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     "
 
     config.vm.define :b1 do |b1|
-        config.vm.hostname = "b1"
-        config.vm.network :private_network, ip: "192.168.22.32"
+        b1.vm.hostname = "b1"
+        b1.vm.network :private_network, ip: "192.168.22.32"
     end
 
     config.vm.define :b2 do |b2|
-        config.vm.hostname = "b2"
-        config.vm.network :private_network, ip: "192.168.22.33"
+        b2.vm.hostname = "b2"
+        b2.vm.network :private_network, ip: "192.168.22.33"
     end
 
     config.vm.define :b3 do |b3|
-        config.vm.hostname = "b3"
-        config.vm.network :private_network, ip: "192.168.22.34"
+        b3.vm.hostname = "b3"
+        b3.vm.network :private_network, ip: "192.168.22.34"
     end
 
     config.vm.define :b4 do |b4|
-        config.vm.hostname = "b4"
-        config.vm.network :private_network, ip: "192.168.22.35"
+        b4.vm.hostname = "b4"
+        b4.vm.network :private_network, ip: "192.168.22.35"
     end
 
 end
