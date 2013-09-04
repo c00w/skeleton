@@ -84,11 +84,11 @@ func findOrchestrator(config *SkeletonDeployment) (string, error) {
 	log.Print("Finding orchestrator")
 	client := makeHttpClient()
 	for _, v := range config.Machines.Ip {
-		_, err := net.DialTimeout("tcp", "v"+":900", 100*time.Millisecond)
+		_, err := net.DialTimeout("tcp", v+":900", 1000*time.Millisecond)
 		if err != nil {
 			continue
 		}
-		_, err = client.Get("http://" + v + ":900:/version")
+		_, err = client.Get("http://" + v + ":900/version")
 		if err == nil {
 			log.Print("Orchestrator Found")
 			return v, nil
@@ -197,6 +197,9 @@ func bootstrapOrchestrator(ip string) string {
 
 // deploy pushes our new deploy configuration to the orchestrator
 func deploy(ip string, config *SkeletonDeployment) {
+
+	log.Print("Pushing configuration to Orchestrator")
+
 	h := makeHttpClient()
 	barr, err := json.Marshal(config)
 	if err != nil {
@@ -205,13 +208,15 @@ func deploy(ip string, config *SkeletonDeployment) {
 
 	b := bytes.NewBuffer(barr)
 
-	resp, err := h.Post("http://"+ip+"/deploy", "application/json", b)
+	resp, err := h.Post("http://"+ip+":900/deploy", "application/json", b)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer resp.Body.Close()
+
+	log.Print("Deploy Pushed")
 
 	logReader(resp.Body)
 
