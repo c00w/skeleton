@@ -1,7 +1,9 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -134,7 +136,8 @@ func runContainer(ip string, image string) {
 	log.Printf("Container created id:%s", id)
 
 	b = bytes.NewBuffer([]byte("{}"))
-	resp, err = h.Post("http://"+ip+":4243/containers/"+id+"/start", "application/json", b)
+	resp, err = h.Post("http://"+ip+":4243/containers/"+id+"/start",
+		"application/json", b)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 204 {
@@ -149,13 +152,12 @@ func runContainer(ip string, image string) {
 
 // buildImage takes a tarpath, and builds it
 func buildImage(ip string, tarpath string, name string) {
-	fd, err := os.Open(tarpath)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	fd := tarDir(tarpath)
 
 	h := makeHttpClient()
-	resp, err := h.Post("http://"+ip+":4243/build?t="+name, "application/tar", fd)
+	resp, err := h.Post("http://"+ip+":4243/build?t="+name,
+		"application/tar", fd)
 
 	if err != nil {
 		log.Fatal(err)
@@ -189,7 +191,7 @@ func loadImage(ip string, image string) {
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
-	buildImage(ip, "../../containers/orchestrator.tar.gz", "orchestrator")
+	buildImage(ip, "../../containers/orchestrator", "orchestrator")
 	runContainer(ip, "orchestrator")
 	log.Print("Orchestrator bootstrapped")
 	return ip
@@ -221,6 +223,62 @@ func deploy(ip string, config *SkeletonDeployment) {
 	logReader(resp.Body)
 
 	return
+}
+
+// tarDir takes a directory path and produces a reader which is all of its
+// contents tarred up and compressed with gzip
+func tarDir(path string) io.Reader {
+
+	// check this is a directory
+	log.Print(path)
+	i, err := os.Stat(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !i.IsDir() {
+		log.Fatal("Directory to tar up is not a directory")
+	}
+
+	//Make a buffer to hold the file
+	b := bytes.NewBuffer(nil)
+	g := gzip.NewWriter(b)
+	w := tar.NewWriter(g)
+
+	// Find subdirectories
+	ifd, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fi, err := ifd.Readdir(-1)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Put them in tarfile
+	for _, f := range fi {
+		h, err := tar.FileInfoHeader(f, "")
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Print(h.Name)
+
+		w.WriteHeader(h)
+
+		ffd, err := os.Open(path + "/" + f.Name())
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		c, err := ioutil.ReadAll(ffd)
+		if err != nil {
+			log.Fatal(err)
+		}
+		w.Write(c)
+	}
+	w.Close()
+	g.Close()
+	return b
 }
 
 func main() {
