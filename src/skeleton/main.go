@@ -167,7 +167,6 @@ func tarDir(path string) io.Reader {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Print(h.Name)
 
 		w.WriteHeader(h)
 
