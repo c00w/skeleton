@@ -1,4 +1,4 @@
-all: bin/skeleton bin/security bin/orchestrator
+all: bin/skeleton bin/security bin/orchestrator containers/orchestrator/orchestrator
 
 containers/orchestrator/orchestrator: bin/orchestrator
 	cp bin/orchestrator containers/orchestrator/orchestrator
