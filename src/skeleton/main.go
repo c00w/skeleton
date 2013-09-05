@@ -200,9 +200,21 @@ func bootstrapOrchestrator(ip string) string {
 // deploy pushes our new deploy configuration to the orchestrator
 func deploy(ip string, config *SkeletonDeployment) {
 
+	log.Print("Pushing images to Orchestrator")
+	h := makeHttpClient()
+
+	for k, _ := range config.Containers {
+		image := tarDir(k)
+		resp, err := h.Post("http://"+ip+":900/image", "application/tar", image)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer resp.Body.Close()
+		logReader(resp.Body)
+	}
+
 	log.Print("Pushing configuration to Orchestrator")
 
-	h := makeHttpClient()
 	barr, err := json.Marshal(config)
 	if err != nil {
 		log.Fatal(err)
