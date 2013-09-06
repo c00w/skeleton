@@ -135,9 +135,8 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 // tarDir takes a directory path and produces a reader which is all of its
 // contents tarred up and compressed with gzip
 func tarDir(path string) io.Reader {
-
+	log.Print("compressing ", path)
 	// check this is a directory
-	log.Print(path)
 	i, err := os.Stat(path)
 	if err != nil {
 		log.Fatal(err)
@@ -201,6 +200,8 @@ func main() {
 
 	// Update Deploy
 	case nil:
+		common.StopImage(orch, "orchestrator")
+		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		deploy(orch, config)
 
 	// Error contacting orchestrator

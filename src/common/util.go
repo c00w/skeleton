@@ -6,8 +6,13 @@ import (
 	"net/http"
 )
 
+var hc *http.Client = nil
+
 func MakeHttpClient() *http.Client {
-	return &http.Client{}
+	if hc == nil {
+		hc = &http.Client{}
+	}
+	return hc
 }
 
 func LogReader(r io.Reader) {

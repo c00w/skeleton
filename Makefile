@@ -3,13 +3,13 @@ all: bin/skeleton bin/security bin/orchestrator containers/orchestrator/orchestr
 containers/orchestrator/orchestrator: bin/orchestrator
 	cp bin/orchestrator containers/orchestrator/orchestrator
 
-bin/skeleton: src/skeleton/*
+bin/skeleton: src/skeleton/* src/common/*
 	GOPATH=$(CURDIR) go install skeleton
 
-bin/security: src/security/*
+bin/security: src/security/* src/common/*
 	GOPATH=$(CURDIR) go install security
 
-bin/orchestrator: src/orchestrator/*
+bin/orchestrator: src/orchestrator/* src/common/*
 	GOPATH=$(CURDIR) go install orchestrator
 
 vagrant:
