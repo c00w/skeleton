@@ -196,13 +196,13 @@ func ImageRunning(ip string, imagename string) (running bool, id string, err err
 	resp, err := h.Get("http://" + ip + ":4243/containers/json")
 
 	if err != nil {
-		log.Fatal(err)
+		return false, "", err
 	}
 	defer resp.Body.Close()
 
 	message, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return false, "", err
 	}
 
 	containers := new([]container)
