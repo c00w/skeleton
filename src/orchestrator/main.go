@@ -16,8 +16,7 @@ type orchestrator struct {
 func (o *orchestrator) StartRepository() {
 	registry_name := "samalba/docker-registry"
 	host := os.Getenv("HOST")
-	for {
-		time.Sleep(100 * time.Millisecond)
+	for ; ; time.Sleep(10 * time.Second) {
 		running, _, err := common.ImageRunning(host, registry_name)
 		if err != nil {
 			log.Print(err)
