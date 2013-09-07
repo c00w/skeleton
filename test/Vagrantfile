@@ -24,6 +24,13 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     start docker
     "
 
+    config.vm.provider :virtualbox do |vb|
+    vb.customize [
+        "modifyvm", :id,
+        "--memory", "256",
+        "--cpus", "1"]
+    end
+
     config.vm.define :b1 do |b1|
         b1.vm.hostname = "b1"
         b1.vm.network :private_network, ip: "192.168.22.32"
