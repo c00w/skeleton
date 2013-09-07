@@ -9,17 +9,9 @@
         ]
     },
     "containers": {
-        "django": {
+        "hello": {
             "quantity" : 1,
             "granularity" : "machine"
-        },
-        "postgresql": {
-            "quantity": 1,
-            "mode": "single"
-        },
-        "fileserver": {
-            "quantity": 1,
-            "mode": "single"
         }
     }
 }

@@ -85,8 +85,11 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	tar := tarDir("../../containers/orchestrator")
-	common.BuildImage(ip, tar, "orchestrator")
-	err := common.RunImage(ip, "orchestrator", true)
+	err := common.BuildImage(ip, tar, "orchestrator")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = common.RunImage(ip, "orchestrator", true)
 	if err != nil {
 		log.Fatal(err)
 	}

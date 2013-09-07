@@ -131,7 +131,7 @@ func DeleteContainer(ip string, id string) {
 }
 
 // TagImage tags an already existing image in the repository
-func TagImage(ip string, name string, tag string) {
+func TagImage(ip string, name string, tag string) (err error) {
 	h := MakeHttpClient()
 	b := bytes.NewBuffer(nil)
 
@@ -139,19 +139,21 @@ func TagImage(ip string, name string, tag string) {
 		"application/json", b)
 
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
 		log.Print(resp)
-		log.Fatal("Code not 201")
+		return errors.New("Code not 201")
 	}
+
+	return nil
 
 }
 
 // buildImage takes a tarfile, and builds it
-func BuildImage(ip string, fd io.Reader, name string) {
+func BuildImage(ip string, fd io.Reader, name string) (err error) {
 
 	h := MakeHttpClient()
 	v := fmt.Sprintf("%d", time.Now().Unix())
@@ -160,14 +162,14 @@ func BuildImage(ip string, fd io.Reader, name string) {
 		"application/tar", fd)
 
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	defer resp.Body.Close()
 
 	LogReader(resp.Body)
 
-	TagImage(ip, name+"%3A"+v, name)
+	return TagImage(ip, name+"%3A"+v, name)
 }
 
 // loadImage pulls a specified image into a docker instance

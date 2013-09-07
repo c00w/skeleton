@@ -15,7 +15,10 @@ bin/orchestrator: src/orchestrator/* src/common/*
 vagrant:
 	VAGRANT_CWD=$(CURDIR)/test vagrant up
 
-test: all vagrant
+test/skeleton/hello/hello: test/skeleton/hello/hello.go
+	cd test/skeleton/hello/ && go build
+
+test: all vagrant test/skeleton/hello/hello
 	GOPATH=$(CURDIR) go test skeleton security orchestrator
 
 clean:
