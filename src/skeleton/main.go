@@ -86,7 +86,10 @@ func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	tar := tarDir("../../containers/orchestrator")
 	common.BuildImage(ip, tar, "orchestrator")
-	common.RunContainer(ip, "orchestrator", true)
+	err := common.RunImage(ip, "orchestrator", true)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Print("Orchestrator bootstrapped")
 	return ip
 }

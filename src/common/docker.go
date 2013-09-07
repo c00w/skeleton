@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,8 +23,8 @@ type image struct {
 	Repository string
 }
 
-// runContainer takes a ip and a docker image to run, and makes sure it is running
-func RunContainer(ip string, imagename string, hint bool) {
+// runImage takes a ip and a docker image to run, and makes sure it is running
+func RunImage(ip string, imagename string, hint bool) (err error) {
 	h := MakeHttpClient()
 
 	e := make([]string, 1)
@@ -37,7 +38,7 @@ func RunContainer(ip string, imagename string, hint bool) {
 
 	ba, err := json.Marshal(c)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	b := bytes.NewBuffer(ba)
 	resp, err := h.Post("http://"+ip+":4243/containers/create",
@@ -47,13 +48,13 @@ func RunContainer(ip string, imagename string, hint bool) {
 	}
 	defer resp.Body.Close()
 
-	s, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 201 {
-		log.Print(string(s))
-		log.Fatal("response status code not 201")
+		return errors.New("response status code not 201")
 	}
+
+	s, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	a := new(container)
@@ -69,17 +70,17 @@ func RunContainer(ip string, imagename string, hint bool) {
 
 	if resp.StatusCode != 204 {
 		LogReader(resp.Body)
-		log.Fatal("start status code is not 204 it is ", resp.StatusCode)
-
+		return errors.New("start status code is not 204")
 	}
 
 	LogReader(resp.Body)
 	log.Printf("Container running")
+	return nil
 
 }
 
 // Stopcontainer stops a container
-func StopContainer(ip string, container string) {
+func StopContainer(ip string, container string) (err error) {
 	log.Print("Stopping container ", container)
 	h := MakeHttpClient()
 	b := bytes.NewBuffer(nil)
@@ -87,59 +88,29 @@ func StopContainer(ip string, container string) {
 	resp, err := h.Post("http://"+ip+":4243/containers/"+container+"/stop?t=1",
 		"application/json", b)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	LogReader(resp.Body)
+	return nil
 }
 
 // StopImage takes a ip and a image to stop and stops it
 func StopImage(ip string, imagename string) {
 	log.Print("Stopping image ", imagename)
-	h := MakeHttpClient()
 
-	resp, err := h.Get("http://" + ip + ":4243/containers/json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	message, err := ioutil.ReadAll(resp.Body)
+	running, id, err := ImageRunning(ip, imagename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	containers := new([]container)
-	json.Unmarshal(message, containers)
-
-	resp, err = h.Get("http://" + ip + ":4243/images/json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	message, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	images := new([]image)
-	json.Unmarshal(message, images)
-
-	imagemap := make(map[string]string)
-
-	for _, v := range *images {
-		imagemap[v.Id] = v.Repository
-	}
-
-	for _, v := range *containers {
-		if strings.SplitN(v.Image, ":", 2)[0] == imagename {
-			id := v.Id
-			StopContainer(ip, id)
-			DeleteContainer(ip, id)
-			break
+	if running {
+		err = StopContainer(ip, id)
+		if err != nil {
+			log.Fatal(err)
 		}
+		DeleteContainer(ip, id)
 	}
 }
 
@@ -200,13 +171,13 @@ func BuildImage(ip string, fd io.Reader, name string) {
 }
 
 // loadImage pulls a specified image into a docker instance
-func LoadImage(ip string, imagename string) {
+func LoadImage(ip string, imagename string) (err error) {
 	h := MakeHttpClient()
 	b := bytes.NewBuffer(nil)
 	resp, err := h.Post("http://"+ip+":4243/images/create?fromImage="+imagename,
 		"text", b)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -216,4 +187,31 @@ func LoadImage(ip string, imagename string) {
 	}
 
 	log.Printf("Image fetched %s", imagename)
+	return nil
+}
+
+// ImageRunning states whether an image is running on a docker instance
+func ImageRunning(ip string, imagename string) (running bool, id string, err error) {
+	h := MakeHttpClient()
+	resp, err := h.Get("http://" + ip + ":4243/containers/json")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	message, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	containers := new([]container)
+	json.Unmarshal(message, containers)
+
+	for _, v := range *containers {
+		if strings.SplitN(v.Image, ":", 2)[0] == imagename {
+			return true, v.Id, nil
+		}
+	}
+	return false, "", nil
 }
