@@ -5,15 +5,16 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 )
 
 func handleImage(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "built")
 	return
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
-		common.BuildImage("192.168.22.32", r.Body, tag[0])
+		common.BuildImage(os.Getenv("HOST"), r.Body, tag[0])
 	}
+	io.WriteString(w, "built")
 }
 
 func main() {

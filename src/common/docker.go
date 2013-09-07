@@ -23,9 +23,23 @@ type image struct {
 }
 
 // runContainer takes a ip and a docker image to run, and makes sure it is running
-func RunContainer(ip string, imagename string) {
+func RunContainer(ip string, imagename string, hint bool) {
 	h := MakeHttpClient()
-	b := bytes.NewBuffer([]byte("{\"Image\":\"" + imagename + "\"}"))
+
+	e := make([]string, 1)
+	e[0] = "HOST=" + ip
+
+	c := make(map[string]interface{})
+	c["Image"] = imagename
+	if hint {
+		c["Env"] = e
+	}
+
+	ba, err := json.Marshal(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+	b := bytes.NewBuffer(ba)
 	resp, err := h.Post("http://"+ip+":4243/containers/create",
 		"application/json", b)
 	if err != nil {
