@@ -89,7 +89,7 @@ func bootstrapOrchestrator(ip string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = common.RunImage(ip, "orchestrator", true)
+	_, err = common.RunImage(ip, "orchestrator", true)
 	if err != nil {
 		log.Fatal(err)
 	}
