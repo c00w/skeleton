@@ -17,8 +17,12 @@ func (o *orchestrator) StartRepository() {
 	log.Print("index setup")
 	registry_name := "samalba/docker-registry"
 	host := os.Getenv("HOST")
+	// So that id is passed out of the function
+	id := ""
+	var err error
+	var running bool
 	for ; ; time.Sleep(10 * time.Second) {
-		running, _, err := common.ImageRunning(host, registry_name)
+		running, id, err = common.ImageRunning(host, registry_name)
 		if err != nil {
 			log.Print(err)
 			continue
@@ -30,7 +34,7 @@ func (o *orchestrator) StartRepository() {
 				log.Print(err)
 				continue
 			}
-			err = common.RunImage(host, registry_name, false)
+			id, err = common.RunImage(host, registry_name, false)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -38,7 +42,17 @@ func (o *orchestrator) StartRepository() {
 		}
 		break
 	}
-	log.Print("index running")
+	log.Print("index running id: ", id)
+	config, err := common.InspectContainer(host, id)
+	log.Print("fetched config")
+	ip := config.NetworkSettings.PortMapping.Tcp["5000"]
+
+	host = host + ":" + ip
+
+	if err != nil {
+		log.Print(err)
+	}
+
 	for {
 		o.repoip <- host
 	}
@@ -46,7 +60,7 @@ func (o *orchestrator) StartRepository() {
 }
 
 func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
-	_ = <-o.repoip
+	repoip := <-o.repoip
 	io.WriteString(w, "Recieved\n")
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
@@ -54,6 +68,21 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 		err := common.BuildImage(os.Getenv("HOST"), r.Body, tag[0])
 		if err != nil {
 			io.WriteString(w, err.Error()+"\n")
+			return
+		}
+
+		io.WriteString(w, "Tagging\n")
+		repo_tag := repoip + "/" + tag[0]
+		err = common.TagImage(os.Getenv("HOST"), tag[0], repo_tag)
+		if err != nil {
+			io.WriteString(w, err.Error())
+			return
+		}
+		io.WriteString(w, "Pushing to index\n")
+		err = common.PushImage(os.Getenv("HOST"), w, repo_tag)
+		if err != nil {
+			io.WriteString(w, err.Error())
+			return
 		}
 	}
 	io.WriteString(w, "built\n")

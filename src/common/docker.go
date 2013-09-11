@@ -13,18 +13,48 @@ import (
 	"time"
 )
 
-type container struct {
-	Id    string
-	Image string
+type containerInfo struct {
+	Id              string
+	Image           string
+	NetworkSettings struct {
+		PortMapping struct {
+			Tcp map[string]string
+		}
+	}
 }
 
-type image struct {
+type imageInfo struct {
 	Id         string
 	Repository string
 }
 
+// InspectContainer take a ip and a container id and returns its port its info
+func InspectContainer(ip string, id string) (info *containerInfo, err error) {
+	h := MakeHttpClient()
+	i := &containerInfo{}
+
+	resp, err := h.Get("http://" + ip + ":4243/containers/" + id + "/json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return i, errors.New("Inspect Container Status is not 200")
+	}
+
+	rall, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	json.Unmarshal(rall, i)
+
+	log.Print("Container inspected")
+	return i, nil
+}
+
 // runImage takes a ip and a docker image to run, and makes sure it is running
-func RunImage(ip string, imagename string, hint bool) (err error) {
+func RunImage(ip string, imagename string, hint bool) (id string, err error) {
 	h := MakeHttpClient()
 
 	e := make([]string, 1)
@@ -38,7 +68,7 @@ func RunImage(ip string, imagename string, hint bool) (err error) {
 
 	ba, err := json.Marshal(c)
 	if err != nil {
-		return err
+		return "", err
 	}
 	b := bytes.NewBuffer(ba)
 	resp, err := h.Post("http://"+ip+":4243/containers/create",
@@ -49,17 +79,17 @@ func RunImage(ip string, imagename string, hint bool) (err error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
-		return errors.New("response status code not 201")
+		return "", errors.New("response status code not 201")
 	}
 
 	s, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	a := new(container)
+	a := &containerInfo{}
 	json.Unmarshal(s, a)
-	id := a.Id
+	id = a.Id
 
 	log.Printf("Container created id:%s", id)
 
@@ -68,14 +98,14 @@ func RunImage(ip string, imagename string, hint bool) (err error) {
 		"application/json", b)
 	defer resp.Body.Close()
 
+	LogReader(resp.Body)
+
 	if resp.StatusCode != 204 {
-		LogReader(resp.Body)
-		return errors.New("start status code is not 204")
+		return "", errors.New("start status code is not 204")
 	}
 
-	LogReader(resp.Body)
 	log.Printf("Container running")
-	return nil
+	return id, nil
 
 }
 
@@ -152,6 +182,29 @@ func TagImage(ip string, name string, tag string) (err error) {
 
 }
 
+func PushImage(ip string, w io.Writer, name string) (err error) {
+	h := MakeHttpClient()
+	b := bytes.NewBuffer([]byte("{}"))
+
+	resp, err := h.Post("http://"+ip+":4243/images/"+name+"/push",
+		"application/json", b)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != 200 {
+		return errors.New("Push image status code is not 200")
+	}
+
+	defer resp.Body.Close()
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // buildImage takes a tarfile, and builds it
 func BuildImage(ip string, fd io.Reader, name string) (err error) {
 
@@ -207,7 +260,7 @@ func ImageRunning(ip string, imagename string) (running bool, id string, err err
 		return false, "", err
 	}
 
-	containers := new([]container)
+	containers := &[]containerInfo{}
 	json.Unmarshal(message, containers)
 
 	for _, v := range *containers {
