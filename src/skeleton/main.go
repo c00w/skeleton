@@ -1,12 +1,9 @@
 package main
 
 import (
-	"archive/tar"
 	"bytes"
 	"common"
-	"compress/gzip"
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -84,7 +81,7 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
-	tar := tarDir("../../containers/orchestrator")
+	tar := common.TarDir("../../containers/orchestrator")
 	err := common.BuildImage(ip, tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
@@ -104,7 +101,7 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 	h := common.MakeHttpClient()
 
 	for k, _ := range config.Containers {
-		image := tarDir(k)
+		image := common.TarDir(k)
 		resp, err := h.Post("http://"+ip+":900/image?name="+k, "application/tar",
 			image)
 		if err != nil {
