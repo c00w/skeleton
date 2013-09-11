@@ -1,12 +1,9 @@
 package main
 
 import (
-	"archive/tar"
 	"bytes"
 	"common"
-	"compress/gzip"
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -84,7 +81,7 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
-	tar := tarDir("../../containers/orchestrator")
+	tar := common.TarDir("../../containers/orchestrator")
 	err := common.BuildImage(ip, tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
@@ -104,7 +101,7 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 	h := common.MakeHttpClient()
 
 	for k, _ := range config.Containers {
-		image := tarDir(k)
+		image := common.TarDir(k)
 		resp, err := h.Post("http://"+ip+":900/image?name="+k, "application/tar",
 			image)
 		if err != nil {
@@ -136,112 +133,6 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 	common.LogReader(resp.Body)
 
 	return
-}
-//heler tarDir function taking in path and a *Writer object (no idea if this actually does what I want)
-func tarDir(path string, w *Writer) {
-	// Find subdirectories
-	ifd, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-
-	fi, err := ifd.Readdir(-1)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Put them in tarfile
-	for _, f := range fi {
-		//need to check f.isDir()
-		//		if true		call tarDir(path+f.name(), w)
-		if f.isDir() {
-			tarDir(path + f.Name(), w)
-		}
-		h, err := tar.FileInfoHeader(f, "")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		w.WriteHeader(h)
-
-		ffd, err := os.Open(path + "/" + f.Name())
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		c, err := ioutil.ReadAll(ffd)
-		if err != nil {
-			log.Fatal(err)
-		}
-		w.Write(c)
-	}
-}
-// tarDir takes a directory path and produces a reader which is all of its
-// contents tarred up and compressed with gzip
-func tarDir(path string) io.Reader {
-	log.Print("compressing ", path)
-	// check this is a directory
-	i, err := os.Stat(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !i.IsDir() {
-		log.Fatal("Directory to tar up is not a directory")
-	}
-
-	//Make a buffer to hold the file
-	b := bytes.NewBuffer(nil)
-	g := gzip.NewWriter(b)
-	w := tar.NewWriter(g)
-
-	//recursiveness needs to happen here
-	//fi is a 'slice' of all of the files/subdirectories at path
-	tarDir(path, w)
-
-
-	/*
-	// Find subdirectories
-	ifd, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-
-	fi, err := ifd.Readdir(-1)
-	if err != nil {
-		log.Fatal(err)
-	}
-	
-
-	// Put them in tarfile
-	for _, f := range fi {
-		//need to check f.isDir()
-		//		if true		call tarDir(path+f.name(), w)
-		h, err := tar.FileInfoHeader(f, "")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		w.WriteHeader(h)
-
-		ffd, err := os.Open(path + "/" + f.Name())
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		c, err := ioutil.ReadAll(ffd)
-		if err != nil {
-			log.Fatal(err)
-		}
-		w.Write(c)
-	}
-	*/
-	w.Close()
-	g.Close()
-	return b
 }
 
 func main() {
