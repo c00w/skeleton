@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+type DockerInfo struct {
+	Ip         string
+	Containers []containerInfo
+	Images     []imageInfo
+	Updated    time.Time
+}
+
 type containerInfo struct {
 	Id              string
 	Image           string
@@ -182,6 +189,7 @@ func TagImage(ip string, name string, tag string) (err error) {
 
 }
 
+// PushImage pushes an image to a docker index
 func PushImage(ip string, w io.Writer, name string) (err error) {
 	h := MakeHttpClient()
 	b := bytes.NewBuffer([]byte("{}"))
@@ -193,7 +201,11 @@ func PushImage(ip string, w io.Writer, name string) (err error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return errors.New("Push image status code is not 200")
+
+		_, err = io.Copy(w, resp.Body)
+		s := fmt.Sprintf("Push image status code is not 200 it is %d",
+			resp.StatusCode)
+		return errors.New(s)
 	}
 
 	defer resp.Body.Close()
@@ -210,7 +222,6 @@ func BuildImage(ip string, fd io.Reader, name string) (err error) {
 
 	h := MakeHttpClient()
 	v := fmt.Sprintf("%d", time.Now().Unix())
-	log.Print(v)
 	resp, err := h.Post("http://"+ip+":4243/build?t="+name+"%3A"+v,
 		"application/tar", fd)
 
@@ -245,28 +256,41 @@ func LoadImage(ip string, imagename string) (err error) {
 	return nil
 }
 
-// ImageRunning states whether an image is running on a docker instance
-func ImageRunning(ip string, imagename string) (running bool, id string, err error) {
+// ListContainers gives the state for a specific docker container
+func ListContainers(ip string) (c []containerInfo, err error) {
 	h := MakeHttpClient()
 	resp, err := h.Get("http://" + ip + ":4243/containers/json")
-
 	if err != nil {
-		return false, "", err
+		return
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != 200 {
+		return c, errors.New("Response code is not 200")
+	}
+
 	message, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	containers := &c
+	err = json.Unmarshal(message, containers)
+	return
+}
+
+// ImageRunning states whether an image is running on a docker instance
+func ImageRunning(ip string, imagename string) (running bool, id string, err error) {
+
+	containers, err := ListContainers(ip)
 	if err != nil {
 		return false, "", err
 	}
 
-	containers := &[]containerInfo{}
-	json.Unmarshal(message, containers)
-
-	for _, v := range *containers {
+	for _, v := range containers {
 		if strings.SplitN(v.Image, ":", 2)[0] == imagename {
 			return true, v.Id, nil
 		}
 	}
-	return false, "", nil
+	return
 }

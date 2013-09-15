@@ -2,7 +2,9 @@ package main
 
 import (
 	"common"
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -10,7 +12,43 @@ import (
 )
 
 type orchestrator struct {
-	repoip chan string
+	repoip      chan string
+	deploystate chan map[string]common.DockerInfo
+	addip       chan string
+}
+
+func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
+	for ; ; time.Sleep(60 * time.Second) {
+		c, err := common.ListContainers(ip)
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		d := common.DockerInfo{ip, c, nil, time.Now()}
+		update <- d
+	}
+}
+
+func (o *orchestrator) StartState() {
+	d := make(map[string]common.DockerInfo)
+	o.deploystate = make(chan map[string]common.DockerInfo)
+	o.addip = make(chan string)
+	updatechan := make(chan common.DockerInfo)
+	for {
+		select {
+		case o.deploystate <- d:
+
+		case ip := <-o.addip:
+			_, exist := d[ip]
+			if !exist {
+				d[ip] = common.DockerInfo{}
+			}
+			go o.pollDocker(ip, updatechan)
+
+		case up := <-updatechan:
+			d[up.Ip] = up
+		}
+	}
 }
 
 func (o *orchestrator) StartRepository() {
@@ -53,6 +91,7 @@ func (o *orchestrator) StartRepository() {
 		log.Print(err)
 	}
 
+	o.repoip = make(chan string)
 	for {
 		o.repoip <- host
 	}
@@ -88,12 +127,39 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "built\n")
 }
 
+func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
+	log.Print("starting deploy")
+
+	d := &common.SkeletonDeployment{}
+	c, err := ioutil.ReadAll(r.Body)
+	log.Print("Ended ReadAll")
+
+	if err != nil {
+		io.WriteString(w, err.Error())
+		return
+	}
+	err = json.Unmarshal(c, d)
+	if err != nil {
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	for _, ip := range d.Machines.Ip {
+		log.Print("adding ip")
+		io.WriteString(w, "Adding ip")
+		io.WriteString(w, ip)
+		o.addip <- ip
+		log.Print("added")
+		io.WriteString(w, "Added")
+	}
+}
+
 func main() {
 
 	o := new(orchestrator)
-	o.repoip = make(chan string)
 
 	go o.StartRepository()
+	go o.StartState()
 
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "v0")
@@ -101,9 +167,7 @@ func main() {
 
 	http.HandleFunc("/image", o.handleImage)
 
-	http.HandleFunc("/deploy", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "deployed")
-	})
+	http.HandleFunc("/deploy", o.deploy)
 
 	log.Fatal(http.ListenAndServe(":900", nil))
 }
