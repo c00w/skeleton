@@ -3,11 +3,13 @@ package main
 import (
 	"common"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -145,6 +147,42 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "built\n")
 }
 
+func (o *orchestrator) calcUpdate(desired common.SkeletonDeployment, current map[string]common.DockerInfo) (update map[string][]string) {
+	// Maps IP's to lists of containers to deploy
+	update = make(map[string][]string)
+	// For each container we want to deploy
+	for container, _ := range desired.Containers {
+		// Assuming granularity machine
+
+		// For each machine check for container
+		for ip, mInfo := range current {
+
+			//Have we found the container
+			found := false
+
+			//Check if the container is running
+			for _, checkContainer := range mInfo.Containers {
+
+				//Get the actual name
+				imageName := strings.SplitN(checkContainer.Id, "/", 2)[0]
+				if imageName == container {
+					found = true
+					break
+				}
+			}
+
+			//Do we need to deploy a image?
+			if !found {
+				update[ip] = append(update[ip], container)
+			}
+
+		}
+	}
+
+	return update
+
+}
+
 func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
 	io.WriteString(w, "Starting deploy\n")
@@ -170,6 +208,13 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Waiting for image refreshes\n")
 	o.WaitRefresh(time.Now())
 	io.WriteString(w, "waited\n")
+
+	current := <-o.deploystate
+
+	diff := o.calcUpdate(*d, current)
+
+	sdiff := fmt.Sprint(diff)
+	io.WriteString(w, sdiff)
 }
 
 func main() {
