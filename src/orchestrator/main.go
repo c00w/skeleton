@@ -51,6 +51,24 @@ func (o *orchestrator) StartState() {
 	}
 }
 
+func (o *orchestrator) WaitRefresh(t time.Time) {
+	for {
+		s := <-o.deploystate
+		good := true
+		for _, v := range s {
+			if v.Updated.After(t) {
+				good = false
+				break
+
+			}
+		}
+		if good {
+			break
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func (o *orchestrator) StartRepository() {
 	log.Print("index setup")
 	registry_name := "samalba/docker-registry"
@@ -148,6 +166,10 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, ip)
 		o.addip <- ip
 	}
+
+	io.WriteString(w, "Waiting for image refreshes\n")
+	o.WaitRefresh(time.Now())
+	io.WriteString(w, "waited\n")
 }
 
 func main() {
