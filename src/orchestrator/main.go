@@ -163,8 +163,15 @@ func (o *orchestrator) calcUpdate(desired common.SkeletonDeployment, current map
 			//Check if the container is running
 			for _, checkContainer := range mInfo.Containers {
 
+				imageName := checkContainer.Id
+
 				//Get the actual name
-				imageName := strings.SplitN(checkContainer.Id, "/", 2)[0]
+				if strings.Contains(imageName, "/") {
+					imageName = strings.SplitN(imageName, "/", 2)[1]
+				}
+				if strings.Contains(imageName, ":") {
+					imageName = strings.SplitN(imageName, ":", 2)[0]
+				}
 				if imageName == container {
 					found = true
 					break
@@ -215,6 +222,29 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
 	sdiff := fmt.Sprint(diff)
 	io.WriteString(w, sdiff)
+	io.WriteString(w, "\n")
+
+	indexip := <-o.repoip
+
+	io.WriteString(w, "Deploying diff\n")
+	for ip, images := range diff {
+		for _, container := range images {
+			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
+			err := common.LoadImage(ip, indexip+"/"+container)
+			if err != nil {
+				io.WriteString(w, err.Error())
+				continue
+			}
+			id, err := common.RunImage(ip, indexip+"/"+container, false)
+			io.WriteString(w, "Deployed \n")
+			io.WriteString(w, id)
+			io.WriteString(w, "\n")
+			if err != nil {
+				io.WriteString(w, err.Error())
+			}
+			io.WriteString(w, "\n")
+		}
+	}
 }
 
 func main() {

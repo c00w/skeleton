@@ -86,7 +86,8 @@ func RunImage(ip string, imagename string, hint bool) (id string, err error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
-		return "", errors.New("response status code not 201")
+		msg := fmt.Sprintf("Create Container Response status is %d", resp.StatusCode)
+		return "", errors.New(msg)
 	}
 
 	s, err := ioutil.ReadAll(resp.Body)
@@ -108,7 +109,8 @@ func RunImage(ip string, imagename string, hint bool) (id string, err error) {
 	LogReader(resp.Body)
 
 	if resp.StatusCode != 204 {
-		return "", errors.New("start status code is not 204")
+		msg := fmt.Sprintf("Start Container Response status is %d", resp.StatusCode)
+		return "", errors.New(msg)
 	}
 
 	log.Printf("Container running")
