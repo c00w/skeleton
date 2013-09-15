@@ -129,7 +129,7 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 
 func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
-	io.WriteString("Starting deploy")
+	io.WriteString(w, "Starting deploy\n")
 	d := &common.SkeletonDeployment{}
 	c, err := ioutil.ReadAll(r.Body)
 
