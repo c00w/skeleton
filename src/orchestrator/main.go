@@ -128,11 +128,10 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
-	log.Print("starting deploy")
 
+	io.WriteString("Starting deploy")
 	d := &common.SkeletonDeployment{}
 	c, err := ioutil.ReadAll(r.Body)
-	log.Print("Ended ReadAll")
 
 	if err != nil {
 		io.WriteString(w, err.Error())
@@ -145,12 +144,9 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, ip := range d.Machines.Ip {
-		log.Print("adding ip")
-		io.WriteString(w, "Adding ip")
+		io.WriteString(w, "Adding ip\n")
 		io.WriteString(w, ip)
 		o.addip <- ip
-		log.Print("added")
-		io.WriteString(w, "Added")
 	}
 }
 
