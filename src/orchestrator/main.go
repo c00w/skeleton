@@ -56,10 +56,10 @@ func (o *orchestrator) StartState() {
 func (o *orchestrator) WaitRefresh(t time.Time) {
 	for {
 		s := <-o.deploystate
-		good := true
+		good := false
 		for _, v := range s {
 			if v.Updated.After(t) {
-				good = false
+				good = true
 				break
 
 			}
@@ -147,7 +147,10 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "built\n")
 }
 
-func (o *orchestrator) calcUpdate(desired common.SkeletonDeployment, current map[string]common.DockerInfo) (update map[string][]string) {
+func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]common.DockerInfo) (update map[string][]string) {
+	c := fmt.Sprint(current)
+	io.WriteString(w, c)
+	io.WriteString(w, "\n")
 	// Maps IP's to lists of containers to deploy
 	update = make(map[string][]string)
 	// For each container we want to deploy
@@ -163,15 +166,22 @@ func (o *orchestrator) calcUpdate(desired common.SkeletonDeployment, current map
 			//Check if the container is running
 			for _, checkContainer := range mInfo.Containers {
 
-				imageName := checkContainer.Id
+				imageName := checkContainer.Image
 
 				//Get the actual name
+				io.WriteString(w, "Image name before proc: ")
+				io.WriteString(w, imageName)
+				io.WriteString(w, "\n")
 				if strings.Contains(imageName, "/") {
 					imageName = strings.SplitN(imageName, "/", 2)[1]
 				}
 				if strings.Contains(imageName, ":") {
 					imageName = strings.SplitN(imageName, ":", 2)[0]
 				}
+				io.WriteString(w, "Image name after proc: ")
+				io.WriteString(w, imageName)
+				io.WriteString(w, "\n")
+
 				if imageName == container {
 					found = true
 					break
@@ -218,7 +228,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
 	current := <-o.deploystate
 
-	diff := o.calcUpdate(*d, current)
+	diff := o.calcUpdate(w, *d, current)
 
 	sdiff := fmt.Sprint(diff)
 	io.WriteString(w, sdiff)
