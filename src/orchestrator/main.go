@@ -258,15 +258,19 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-
-	o := new(orchestrator)
-
+func NewOrchestrator() (o *orchestrator) {
+	o = new(orchestrator)
 	go o.StartRepository()
 	go o.StartState()
+	return o
+}
+
+func main() {
+
+	o := NewOrchestrator()
 
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "v0")
+		io.WriteString(w, "orchestrator v0")
 	})
 
 	http.HandleFunc("/image", o.handleImage)
