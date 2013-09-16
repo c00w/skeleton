@@ -23,4 +23,4 @@ test: all vagrant test/skeleton/hello/hello
 
 clean:
 	VAGRANT_CWD=$(CURDIR)/test vagrant destroy -f
-.PHONY: all test vagrant
+.PHONY: all test vagrant clean
