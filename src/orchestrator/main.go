@@ -219,6 +219,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	for _, ip := range d.Machines.Ip {
 		io.WriteString(w, "Adding ip\n")
 		io.WriteString(w, ip)
+		io.WriteString(w, "\n")
 		o.addip <- ip
 	}
 
