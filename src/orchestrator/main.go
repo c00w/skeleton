@@ -111,7 +111,6 @@ func (o *orchestrator) StartRepository() {
 		log.Print(err)
 	}
 
-	o.repoip = make(chan string)
 	for {
 		o.repoip <- host
 	}
@@ -119,9 +118,7 @@ func (o *orchestrator) StartRepository() {
 }
 
 func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
-	if o.repoip == nil {
-		io.WriteString(w, "Waiting for index to be downloaded, this may take a while")
-	}
+	io.WriteString(w, "Waiting for index to be downloaded, this may take a while")
 	repoip := <-o.repoip
 	io.WriteString(w, "Recieved\n")
 	tag := r.URL.Query()["name"]
@@ -263,8 +260,9 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
 func NewOrchestrator() (o *orchestrator) {
 	o = new(orchestrator)
-	go o.StartRepository()
+	o.repoip = make(chan string)
 	go o.StartState()
+	go o.StartRepository()
 	return o
 }
 
