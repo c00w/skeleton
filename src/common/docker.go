@@ -23,52 +23,51 @@ type image struct {
 	Repository string
 }
 
-type http struct {
+type httpAPI struct {
 	ip string
 }
 
 // function to initialize new http struct
-func NewHttpClient (ip string) ( h * http ) {
-	h := &http{ip}
+func NewHttpClient(ip string) (h *httpAPI) {
+	h = &httpAPI{ip}
+	return
 }
 
-
 // Post function to clean up http.Post calls in code, method for http struct
-func (h * http) Post (url string, content string, b io.Reader) (resp io.Reader, err error) {
+func (h *httpAPI) Post(url string, content string, b io.Reader) (resp *http.Response, err error) {
 	c := MakeHttpClient()
-	
-	resp, err := c.Post("http://"+h.ip+":4243/"+url,
+
+	resp, err = c.Post("http://"+h.ip+":4243/"+url,
 		content, b)
-		
-	return resp.Body(), err	
+
+	return
 }
 
 // Get function to clean up http.Get calls in code, method for http struct
-func (h * http) Get ( url string ) ( resp io.Reader err error ) {
+func (h *httpAPI) Get(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
-	
-	resp, err := c.Get( "http://"+h.ip+":4243/"+url )
-	
-	return resp.Body(), err	
+
+	resp, err = c.Get("http://" + h.ip + ":4243/" + url)
+
+	return
 }
 
 // Delete function to clean up http.NewRequest("DELETE"...) call, method for http struct
-func (h * http) Delete ( url string ) ( resp io.Reader, err error ) {
-	c:= MakeHttpClient()
-	
-	req, err := http.NewRequest("DELETE",
-	"http://"+h.ip+":4243/"+url, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	resp, err := c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	
-	return resp.Body(), err
-}
+func (h *httpAPI) Delete(url string) (resp *http.Response, err error) {
+	c := MakeHttpClient()
 
+	req, err := http.NewRequest("DELETE",
+		"http://"+h.ip+":4243/"+url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	resp, err = c.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return
+}
 
 // runImage takes a ip and a docker image to run, and makes sure it is running
 func RunImage(ip string, imagename string, hint bool) (err error) {
@@ -88,9 +87,9 @@ func RunImage(ip string, imagename string, hint bool) (err error) {
 		return err
 	}
 	b := bytes.NewBuffer(ba)
-	
+
 	resp, err := h.Post("containers/create", "application/json", b)
-	
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,7 +112,7 @@ func RunImage(ip string, imagename string, hint bool) (err error) {
 
 	b = bytes.NewBuffer([]byte("{}"))
 	resp, err = h.Post("containers/"+id+"/start", "application/json", b)
-	
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 204 {
@@ -134,7 +133,7 @@ func StopContainer(ip string, container string) (err error) {
 	b := bytes.NewBuffer(nil)
 
 	resp, err := h.Post("containers/"+container+"/stop?t=1", "application/json", b)
-	
+
 	if err != nil {
 		return err
 	}
@@ -162,13 +161,17 @@ func StopImage(ip string, imagename string) {
 	}
 }
 
-func DeleteContainer(ip string, id string) {
+func DeleteContainer(ip string, id string) (err error) {
 	log.Print("deleting container ", id)
 	h := NewHttpClient(ip)
-	resp, err := h.Delete("containers/"+id)
+	resp, err := h.Delete("containers/" + id)
+	if err != nil {
+		return err
+	}
 
 	defer resp.Body.Close()
 	LogReader(resp.Body)
+	return
 }
 
 // TagImage tags an already existing image in the repository
@@ -198,7 +201,7 @@ func BuildImage(ip string, fd io.Reader, name string) (err error) {
 	h := NewHttpClient(ip)
 	v := fmt.Sprintf("%d", time.Now().Unix())
 	log.Print(v)
-	
+
 	resp, err := h.Post("build?t="+name+"%3A"+v,
 		"application/tar", fd)
 
