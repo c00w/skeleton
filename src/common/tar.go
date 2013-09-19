@@ -55,7 +55,6 @@ func tardir(path string, totar map[*tar.Header][]byte) {
 // tarDir takes a directory path and produces a reader which is all of its
 // contents tarred up and compressed with gzip
 func TarDir(path string) io.Reader {
-	log.Print("compressing ", path)
 	// check this is a directory
 	i, err := os.Stat(path)
 	if err != nil {

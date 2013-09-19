@@ -121,6 +121,7 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 	b := bytes.NewBuffer(barr)
 
 	resp, err := h.Post("http://"+ip+":900/deploy", "application/json", b)
+	log.Print("Post returned")
 
 	if err != nil {
 		log.Fatal(err)

@@ -17,7 +17,7 @@ func MakeHttpClient() *http.Client {
 
 func LogReader(r io.Reader) {
 	buff := make([]byte, 1024)
-	for _, err := r.Read(buff); err == nil; _, err = r.Read(buff) {
-		log.Print(string(buff))
+	for n, err := r.Read(buff); err == nil; n, err = r.Read(buff) {
+		log.Print(string(buff[0:n]))
 	}
 }
