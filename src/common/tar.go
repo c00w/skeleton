@@ -33,8 +33,7 @@ func tardir(path string, totar map[*tar.Header][]byte) {
 			if err != nil {
 				log.Fatal(err)
 			}
-
-			//w.WriteHeader(h)
+			h.Name = path + "/" + h.Name
 
 			ffd, err := os.Open(path + "/" + f.Name())
 
