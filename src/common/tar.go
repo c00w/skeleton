@@ -81,44 +81,7 @@ func TarDir(path string) io.Reader {
 		w.Write(v)
 	}
 
-	/*
-		// Find subdirectories
-		ifd, err := os.Open(path)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-
-		fi, err := ifd.Readdir(-1)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-
-		// Put them in tarfile
-		for _, f := range fi {
-			//need to check f.isDir()
-			//		if true		call tarDir(path+f.name(), w)
-			h, err := tar.FileInfoHeader(f, "")
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			w.WriteHeader(h)
-
-			ffd, err := os.Open(path + "/" + f.Name())
-
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			c, err := ioutil.ReadAll(ffd)
-			if err != nil {
-				log.Fatal(err)
-			}
-			w.Write(c)
-		}
-	*/
+	
 	w.Close()
 	g.Close()
 	return b
