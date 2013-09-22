@@ -7,3 +7,4 @@ SET VAGRANT_CWD=%CD%/test
 vagrant up
 cd test/skeleton/hello/ && go build
 go test skeleton security orchestrator
+pause
