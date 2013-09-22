@@ -19,7 +19,7 @@ or look at the examples
 There are three main components in skeleton
 
 1. The Orchestration Server
-2. The Secret Server
+2. The GateKeeper Server
 3. The Database Docker Containers
 
 # The Orchestration Server
@@ -27,7 +27,7 @@ There are three main components in skeleton
 This server receives deployment information and updates the configuration to
 match it. It is designed to be intelligent and only make the necessary changes
 
-# The Secret Server
+# The GateKeeper Server
 
 This stores all secrets and also stores deployment specific details
 like server ip addresses. This can be queried using the provided command line
