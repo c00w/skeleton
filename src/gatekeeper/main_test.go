@@ -24,3 +24,38 @@ func TestGetNewSet(t *testing.T) {
         t.Error(errors.New("key value is not value2"))
     }
 }
+
+func TestPermission(t *testing.T) {
+    g := NewGateKeeper()
+    g.owners["key"] = true
+
+    err := g.New("name", "value", "key")
+    if err != nil {
+        t.Error(err)
+    }
+
+    err = g.AddAccess("name", "key", "keyother")
+    if err != nil {
+        t.Error(err)
+    }
+
+    v, err := g.Get("name", "keyother")
+    if err != nil {
+        t.Error(err)
+    }
+    if v  != "value" {
+        t.Error(errors.New("key value is not value"))
+    }
+
+    err = g.RemoveAccess("name", "key", "keyother")
+    if err != nil {
+        t.Error(err)
+    }
+
+    v, err = g.Get("name", "keyother")
+    if err == nil {
+        t.Error(errors.New("No permission denied thrown"))
+    }
+
+}
+
