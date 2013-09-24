@@ -19,6 +19,18 @@ type gatekeeper struct {
 	owners map[string]bool
 }
 
+func NewGateKeeper() (g * gatekeeper) {
+    g = new(gatekeeper)
+    g.owners = make(map[string]bool)
+    g.objects = make(map[string]struct {
+		value       string
+		owner       string
+		permissions map[string]bool
+    })
+    return g
+
+}
+
 func (g *gatekeeper) Get(item, key string) (value string, err error) {
 	err = errors.New("No Such Item or Permission Denied")
 
@@ -50,6 +62,7 @@ func (g *gatekeeper) New(item, value, key string) (err error) {
 	}
 
     v.owner = key
+    v.permissions = make(map[string]bool)
     v.permissions[key] = true
 	v.value = value
 	g.objects[item] = v
@@ -191,7 +204,7 @@ func (g *gatekeeper) permission(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	g := new(gatekeeper)
+	g := NewGateKeeper()
 
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "gatekeeper v0")
