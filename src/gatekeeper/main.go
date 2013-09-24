@@ -35,6 +35,28 @@ func (g *gatekeeper) Get(item, key string) (value string, err error) {
 	return o.value, nil
 }
 
+func (g *gatekeeper) New(item, value, key string) (err error) {
+	err = errors.New("Permission Denied")
+
+	ok := g.owners[key]
+	if !ok {
+		return
+	}
+
+	v, found := g.objects[item]
+
+	if found {
+		return
+	}
+
+    v.owner = key
+    v.permissions[key] = true
+	v.value = value
+	g.objects[item] = v
+	return nil
+}
+
+
 func (g *gatekeeper) Set(item, value, key string) (err error) {
 	err = errors.New("Permission Denied")
 
@@ -50,8 +72,7 @@ func (g *gatekeeper) Set(item, value, key string) (err error) {
 	}
 
 	if !found {
-		v.owner = key
-		v.permissions[key] = true
+        return
 	}
 
 	v.value = value
@@ -97,7 +118,6 @@ func (g *gatekeeper) RemoveAccess(item, key, newkey string) (err error) {
 }
 
 func (g *gatekeeper) object(w http.ResponseWriter, r *http.Request) {
-	//Extract information from query
 	key := r.FormValue("key")
 	item := r.URL.Path
 	s := strings.Split(item, "/")
@@ -106,14 +126,19 @@ func (g *gatekeeper) object(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var v string
 
+    value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
+
 	switch r.Method {
 
 	case "GET":
 		v, err = g.Get(item, key)
 
 	case "PUT":
+        if err == nil {
+            err = g.New(item, string(value), key)
+        }
+
 	case "POST":
-		value, err := ioutil.ReadAll(r.Body)
 		if err == nil {
 			err = g.Set(item, string(value), key)
 		}
@@ -129,6 +154,42 @@ func (g *gatekeeper) object(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	io.WriteString(w, v)
 }
+
+func (g *gatekeeper) permission(w http.ResponseWriter, r *http.Request) {
+	key := r.FormValue("key")
+	item := r.URL.Path
+	s := strings.Split(item, "/")
+	item = s[len(s)]
+
+	var err error
+	var v string
+
+    value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
+
+	switch r.Method {
+
+	case "POST":
+		if err == nil {
+			err = g.AddAccess(item, key, string(value))
+		}
+
+    case "DELETE":
+        if err == nil {
+            err = g.RemoveAccess(item, key, string(value))
+        }
+    }
+
+	w.Header().Set("Content-Type", "text/plain; chaset=utf-8")
+	if err != nil {
+		w.WriteHeader(400)
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	w.WriteHeader(200)
+	io.WriteString(w, v)
+}
+
 
 func main() {
 
