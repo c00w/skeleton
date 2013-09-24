@@ -162,7 +162,6 @@ func (g *gatekeeper) permission(w http.ResponseWriter, r *http.Request) {
 	item = s[len(s)]
 
 	var err error
-	var v string
 
     value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
 
@@ -187,7 +186,6 @@ func (g *gatekeeper) permission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(200)
-	io.WriteString(w, v)
 }
 
 
