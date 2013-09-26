@@ -13,17 +13,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.vm.box_url = "http://puppet-vagrant-boxes.puppetlabs.com/ubuntu-server-12042-x64-vbox4210-nocm.box"
     config.vm.box = "ubuntu-server-12042-x64-vbox4210-nocm.box"
 
-    config.vm.provision :shell, :inline => "
-    sh -c \"curl https://get.docker.io/gpg | apt-key add -\"
-    sh -c \"echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list\"
-    apt-get update
-    apt-get install lxc-docker -y
-    sed -i 's/docker -d$/docker -d -H=tcp:\\/\\/0.0.0.0/g' /etc/init/docker.conf
-    stop docker
-    initctl reload docker
-    start docker
-    "
-
     config.vm.provider :virtualbox do |vb|
     vb.customize [
         "modifyvm", :id,
@@ -34,21 +23,25 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.vm.define :b1 do |b1|
         b1.vm.hostname = "b1"
         b1.vm.network :private_network, ip: "192.168.22.32"
+        b1.vm.provision "shell", path: "provision.sh"
     end
 
     config.vm.define :b2 do |b2|
         b2.vm.hostname = "b2"
         b2.vm.network :private_network, ip: "192.168.22.33"
+        b2.vm.provision "shell", path: "provision.sh"
     end
 
     config.vm.define :b3 do |b3|
         b3.vm.hostname = "b3"
         b3.vm.network :private_network, ip: "192.168.22.34"
+        b3.vm.provision "shell", path: "provision.sh"
     end
 
     config.vm.define :b4 do |b4|
         b4.vm.hostname = "b4"
         b4.vm.network :private_network, ip: "192.168.22.35"
+        b4.vm.provision "shell", path: "provision.sh"
     end
 
 end
