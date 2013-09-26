@@ -42,7 +42,8 @@ request
 
 # Ubuntu Testing Instructions
 
-Install go, virtualbox, vagrant, and make
+Install go (from golang.org), virtualbox(from virtualbox.org), 
+vagrant(from vagrantup.com), and make (from ubuntu repos)
 
 Run make test
 
