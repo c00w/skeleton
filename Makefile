@@ -19,7 +19,7 @@ test/skeleton/hello/hello: test/skeleton/hello/hello.go
 	cd test/skeleton/hello/ && go build
 
 test: all vagrant test/skeleton/hello/hello
-	GOPATH=$(CURDIR) go test skeleton gatekeeper orchestrator
+	GOPATH=$(CURDIR) go test skeleton gatekeeper orchestrator dumbtar
 
 clean:
 	VAGRANT_CWD=$(CURDIR)/test vagrant destroy -f
