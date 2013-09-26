@@ -81,12 +81,13 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
+	D := common.NewDocker(ip)
 	tar := common.TarDir("../../containers/orchestrator")
-	err := common.BuildImage(ip, tar, "orchestrator")
+	err := D.BuildImage(ip, tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = common.RunImage(ip, "orchestrator", true)
+	_, err = D.RunImage(ip, "orchestrator", true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -150,7 +151,8 @@ func main() {
 
 	// Update Deploy
 	case nil:
-		common.StopImage(orch, "orchestrator")
+		D := common.NewDocker(orch)
+		D.StopImage(orch, "orchestrator")
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		deploy(orch, config)
 

@@ -1,9 +1,17 @@
 SET GOPATH=%CD%
 go install skeleton
-go install security
+SET GOOS=linux
+SET GOPATH=amd64
+go install gatekeeper
 go install orchestrator
-cp bin/orchestrator containers/orchestrator/orchestrator
-SET VAGRANT_CWD=%CD%/test
+copy bin\orchestrator.exe containers\orchestrator\orchestrator
+SET VAGRANT_CWD=%CD%\test
 vagrant up
-cd test/skeleton/hello/ && go build
-go test skeleton security orchestrator
+set GOPATH=test\skeleton\hello\
+go build
+SET GOOS=
+set GOARCH=
+SET GOPATH=%CD%
+go test skeleton
+go test security orchestrator
+pause
