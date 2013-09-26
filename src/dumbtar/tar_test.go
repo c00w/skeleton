@@ -10,7 +10,7 @@ import (
 
 func TestTarDir(t *testing.T){
 
-	err := os.Chdir(os.Getenv("GOPATH") + "/test/tartest")
+	err := os.Chdir(os.Getenv("GOPATH") + "/test/tartest/")
 	if err != nil {
 		t.Error(err)
 	}
