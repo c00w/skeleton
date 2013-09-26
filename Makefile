@@ -1,16 +1,19 @@
-all: bin/skeleton bin/gatekeeper bin/orchestrator containers/orchestrator/orchestrator
+all: bin/skeleton bin/gatekeeper bin/orchestrator containers/orchestrator/orchestrator containers/gatekeeper/gatekeeper
 
 containers/orchestrator/orchestrator: bin/orchestrator
 	cp bin/orchestrator containers/orchestrator/orchestrator
 
-bin/skeleton: src/skeleton/* src/common/*
-	GOPATH=$(CURDIR) go install skeleton
+containers/gatekeeper/gatekeeper: bin/gatekeeper
+	cp bin/gatekeeper containers/gatekeeper/gatekeeper
 
-bin/gatekeeper: src/gatekeeper/* src/common/*
-	GOPATH=$(CURDIR) go install gatekeeper
+bin/skeleton: src/skeleton/*.go src/common/*.go
+	GOPATH=$(CURDIR) go install skeleton -a
 
-bin/orchestrator: src/orchestrator/* src/common/*
-	GOPATH=$(CURDIR) go install orchestrator
+bin/gatekeeper: src/gatekeeper/*.go src/common/*.go
+	GOPATH=$(CURDIR) go install gatekeeper -a
+
+bin/orchestrator: src/orchestrator/*.go src/common/*.go
+	GOPATH=$(CURDIR) go install orchestrator -a
 
 vagrant:
 	VAGRANT_CWD=$(CURDIR)/test vagrant up
@@ -23,4 +26,5 @@ test: all vagrant test/skeleton/hello/hello
 
 clean:
 	VAGRANT_CWD=$(CURDIR)/test vagrant destroy -f
+
 .PHONY: all test vagrant clean

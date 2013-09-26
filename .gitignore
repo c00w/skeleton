@@ -5,6 +5,7 @@ src/code.google.com/
 *.vagrant
 *.tar.gz
 containers/orchestrator/orchestrator
+containers/gatekeeper/gatekeeper
 test/skeleton/hello/hello
 
 # Github default
