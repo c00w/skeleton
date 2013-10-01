@@ -82,11 +82,22 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	D := common.NewDocker(ip)
+
+    //Setup orchestrator container
 	tar := common.TarDir("../../containers/orchestrator")
 	err := D.BuildImage(ip, tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+    //Setup gatekeeper container
+	tar = common.TarDir("../../containers/gatekeeper")
+    err = D.BuildImage(ip, tar, "gatekeeper")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    //Run orchestrator
 	_, err = D.RunImage(ip, "orchestrator", true)
 	if err != nil {
 		log.Fatal(err)

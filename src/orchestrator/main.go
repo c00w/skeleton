@@ -119,7 +119,7 @@ func (o *orchestrator) StartRepository() {
 }
 
 func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Waiting for index to be downloaded, this may take a while")
+	io.WriteString(w, "Waiting for index to be downloaded, this may take a while\n")
 	repoip := <-o.repoip
 	io.WriteString(w, "Recieved\n")
 	tag := r.URL.Query()["name"]

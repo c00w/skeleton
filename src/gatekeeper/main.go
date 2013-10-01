@@ -211,7 +211,7 @@ func main() {
 	})
 
 	http.HandleFunc("/object/", g.object)
-	http.HandleFunc("/permissions/", g.object)
+	http.HandleFunc("/permissions/", g.permission)
 
 	log.Fatal(http.ListenAndServe(":800", nil))
 }
