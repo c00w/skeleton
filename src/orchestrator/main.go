@@ -17,7 +17,7 @@ type orchestrator struct {
 	repoip      chan string
 	deploystate chan map[string]common.DockerInfo
 	addip       chan string
-	D			*common.Docker
+	D           *common.Docker
 }
 
 func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
@@ -74,25 +74,29 @@ func (o *orchestrator) WaitRefresh(t time.Time) {
 
 func (o *orchestrator) StartRepository() {
 	log.Print("index setup")
-	registry_name := "samalba/docker-registry"
+	registryName := "samalba/docker-registry"
+	o.startImage(registryName, o.repoip)
+}
+
+func (o *orchestrator) startImage(registryName string, portchan chan string) {
 	// So that id is passed out of the function
 	id := ""
 	var err error
 	var running bool
 	for ; ; time.Sleep(10 * time.Second) {
-		running, id, err = o.D.ImageRunning(registry_name)
+		running, id, err = o.D.ImageRunning(registryName)
 		if err != nil {
 			log.Print(err)
 			continue
 		}
 		if !running {
-			log.Print("index not running")
-			err := o.D.LoadImage(registry_name)
+			log.Print(registryName + " not running")
+			err := o.D.LoadImage(registryName)
 			if err != nil {
 				log.Print(err)
 				continue
 			}
-			id, err = o.D.RunImage(registry_name, false)
+			id, err = o.D.RunImage(registryName, false)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -100,19 +104,19 @@ func (o *orchestrator) StartRepository() {
 		}
 		break
 	}
-	log.Print("index running id: ", id)
+	log.Print(registryName+" running id: ", id)
 	config, err := o.D.InspectContainer(id)
-	log.Print("fetched config")
+	log.Print(registryName + "fetched config")
 	port := config.NetworkSettings.PortMapping.Tcp["5000"]
 
-    host := o.D.GetIP() + ":" + port
+	host := o.D.GetIP() + ":" + port
 
 	if err != nil {
 		log.Print(err)
 	}
 
 	for {
-		o.repoip <- host
+		portchan <- host
 	}
 
 }
@@ -234,9 +238,9 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Deploying diff\n")
 	for ip, images := range diff {
 		for _, container := range images {
-            D := common.NewDocker(ip)
+			D := common.NewDocker(ip)
 			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
-			err := D.LoadImage(indexip+"/"+container)
+			err := D.LoadImage(indexip + "/" + container)
 			if err != nil {
 				io.WriteString(w, err.Error())
 				continue
