@@ -45,11 +45,11 @@ request
 Install go (from golang.org), virtualbox(from virtualbox.org), 
 vagrant(from vagrantup.com), and make (from ubuntu repos)
 
-Run make test
+Run make test in repository directory
 
 # Windows Testing Instructions
 
-Install minggw, go, virtualbox, vagrant
+Install mingw, go, virtualbox, vagrant
 
 Go to C:\Go\src
 Run the following in the shell
