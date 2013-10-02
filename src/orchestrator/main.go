@@ -14,10 +14,11 @@ import (
 )
 
 type orchestrator struct {
-	repoip      chan string
-	deploystate chan map[string]common.DockerInfo
-	addip       chan string
-	D           *common.Docker
+	repoip       chan string
+	gatekeeperip chan string
+	deploystate  chan map[string]common.DockerInfo
+	addip        chan string
+	D            *common.Docker
 }
 
 func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
@@ -76,6 +77,12 @@ func (o *orchestrator) StartRepository() {
 	log.Print("index setup")
 	registryName := "samalba/docker-registry"
 	o.startImage(registryName, o.repoip)
+}
+
+func (o *orchestrator) StartGatekeeper() {
+	log.Print("gatekeeper setup")
+	registryName := "gatekeeper"
+	o.startImage(registryName, o.gatekeeperip)
 }
 
 func (o *orchestrator) startImage(registryName string, portchan chan string) {
@@ -260,8 +267,10 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 func NewOrchestrator() (o *orchestrator) {
 	o = new(orchestrator)
 	o.repoip = make(chan string)
+	o.gatekeeperip = make(chan string)
 	go o.StartState()
 	go o.StartRepository()
+	go o.StartGatekeeper()
 	o.D = common.NewDocker(os.Getenv("HOST"))
 	return o
 }
