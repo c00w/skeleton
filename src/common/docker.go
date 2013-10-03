@@ -40,9 +40,15 @@ type httpAPI struct {
 	ip string
 }
 
-// function to initialize new http struct
+// function to initialize new httpAPI struct
 func NewHttpClient(ip string) (h *httpAPI) {
 	h = &httpAPI{ip}
+	return
+}
+
+// function to initialize new Docker struct 
+func NewDocker(ip string) (D *Docker) {
+	D = &Docker{NewHttpClient(ip)}
 	return
 }
 
@@ -67,7 +73,7 @@ func (h *httpAPI) PostHeader(url string, content string, b io.Reader, header htt
 	}
 
     req.Header = header
-    req.Header.Set("Content-TYpe", content)
+    req.Header.Set("Content-Type", content)
 
 	resp, err = c.Do(req)
 	if err != nil {
@@ -104,31 +110,35 @@ func (h *httpAPI) Delete(url string) (resp *http.Response, err error) {
 	return
 }
 
-
 func (D *Docker) GetIP() string {
     return D.h.ip
 }
 
 // function to periodically update information in Docker struct
-func (D *Docker) Update(ip string) {
+func (D *Docker) Update() {
 	for ; ; time.Sleep(60 * time.Second) {
-		c, err := D.ListContainers(ip)
-		img, err := D.ListImages(ip)
+		c, err := D.ListContainers()
 		if err != nil {
 			log.Print(err)
 			continue
 		}
-		D = Docker{&httpAPI{ip},c, img, time.Now()}
+		
+		img, err := D.ListImages()
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		
+		D = Docker{_,c, img, time.Now()}
 		update <- D
 	}
 }
 
-// InspectContainer takes an ip and a container id, and returns its port and its info
-func (C *Container) Inspect(ip string) (err error) {
-	h = NewHttpClient(ip)
-	C = &Container{}
+// InspectContainer takes a container, and returns its port and its info
+func (D *Docker) InspectContainer(id string) (err error) {
+	C := &Container{}
 
-	resp, err := D.h.Get("/containers/" + C.Id + "/json")
+	resp, err := D.h.Get("/containers/" + id + "/json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,7 +159,7 @@ func (C *Container) Inspect(ip string) (err error) {
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (C *Container) RunImage(imagename string, hint bool) (id string, err error) {
+func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 
 	e := make([]string, 1)
 	e[0] = "HOST=" + D.h.ip
@@ -206,12 +216,11 @@ func (C *Container) RunImage(imagename string, hint bool) (id string, err error)
 
 }
 
-// Stopcontainer stops a container
-func (C *Container) StopContainer(ip string, container string) (err error) {
+// StopContainer stops a container
+func (D *Docker) StopContainer(container string) (err error) {
 	log.Print("Stopping container ", container)
-	h = NewHttpClient(ip)
 
-	resp, err := h.Post("containers/"+container+"/stop?t=1", "application/json", b)
+	resp, err := D.h.Post("containers/"+container+"/stop?t=1", "application/json", b)
 
 	if err != nil {
 		return err
@@ -240,10 +249,10 @@ func (D *Docker) StopImage(imagename string) {
 	}
 }
 
-func (C *Container) Delete(ip string) (err error) {
-	log.Print("deleting container ", C.Id)
-	h = NewHttpClient(ip)
-	resp, err := h.Delete("containers/" + C.Id)
+func (D *Docker) DeleteContainer(id string) (err error) {
+	log.Print("deleting container ", id)
+
+	resp, err := D.h.Delete("containers/" + id)
 	if err != nil {
 		return err
 	}
@@ -374,8 +383,7 @@ func (D *Docker) ListContainers() (c []Container, err error) {
 }
 
 // ListImages gives the state of the images for a specific Docker container
-func (D *Docker) ListImages(ip string) (img []Image, err error) {
-	D.h = NewHttpClient(ip)
+func (D *Docker) ListImages() (img []Image, err error) {
 	resp, err := D.h.Get("images/json")
 	
 		if err != nil {

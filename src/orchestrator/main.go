@@ -15,16 +15,16 @@ import (
 
 type orchestrator struct {
 	repoip      chan string
-	deploystate chan map[string]common.DockerInfo
+	deploystate chan map[string]common.Docker
 	addip       chan string
 	D			*common.Docker
 }
 
 func (o *orchestrator) StartState() {
-	d := make(map[string]common.DockerInfo)
-	o.deploystate = make(chan map[string]common.DockerInfo)
+	d := make(map[string]common.Docker)
+	o.deploystate = make(chan map[string]common.Docker)
 	o.addip = make(chan string)
-	updatechan := make(chan common.DockerInfo)
+	updatechan := make(chan common.Docker)
 	for {
 		select {
 		case o.deploystate <- d:
@@ -32,7 +32,7 @@ func (o *orchestrator) StartState() {
 		case ip := <-o.addip:
 			_, exist := d[ip]
 			if !exist {
-				d[ip] = common.DockerInfo{}
+				d[ip] = common.Docker{}
 			}
 			go o.pollDocker(ip, updatechan)
 
