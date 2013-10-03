@@ -48,7 +48,8 @@ func NewHttpClient(ip string) (h *httpAPI) {
 
 // function to initialize new Docker struct 
 func NewDocker(ip string) (D *Docker) {
-	D = &Docker{NewHttpClient(ip)}
+	D = &Docker{}
+	D.h = NewHttpClient(ip)
 	return
 }
 
@@ -129,8 +130,10 @@ func (D *Docker) Update() {
 			continue
 		}
 		
-		D = Docker{_,c, img, time.Now()}
-		update <- D
+
+		D.Containers = c
+		D.Images = img
+		D.Updated = time.Now()
 	}
 }
 
@@ -176,7 +179,7 @@ func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 	}
 	b := bytes.NewBuffer(ba)
 
-	resp, err := h.Post("containers/create", "application/json", b)
+	resp, err := D.h.Post("containers/create", "application/json", b)
 
 	if err != nil {
 		log.Fatal(err)
@@ -219,7 +222,8 @@ func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 // StopContainer stops a container
 func (D *Docker) StopContainer(container string) (err error) {
 	log.Print("Stopping container ", container)
-
+	b := bytes.NewBuffer(nil)
+	
 	resp, err := D.h.Post("containers/"+container+"/stop?t=1", "application/json", b)
 
 	if err != nil {
