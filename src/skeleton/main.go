@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"time"
+	"flag"
 )
 
 type NoOrchestratorFound struct{}
@@ -81,12 +82,13 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
+	D := common.NewDocker(ip)
 	tar := common.TarDir("../../containers/orchestrator")
-	err := common.BuildImage(ip, tar, "orchestrator")
+	err := D.BuildImage(tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = common.RunImage(ip, "orchestrator", true)
+	_, err = D.RunImage("orchestrator", true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -138,6 +140,8 @@ func deploy(ip string, config *common.SkeletonDeployment) (error) {
 
 func main() {
 
+	flag.Parse()
+	if(flag.Args()[0]=="deploy"){
 	config := loadBonesFile()
 
 	orch, err := findOrchestrator(config)
@@ -153,7 +157,8 @@ func main() {
 
 	// Update Deploy
 	case nil:
-		common.StopImage(orch, "orchestrator")
+		D := common.NewDocker(orch)
+		D.StopImage("orchestrator")
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		err = deploy(orch, config)
 		if(err!=nil) {
@@ -163,5 +168,6 @@ func main() {
 	// Error contacting orchestrator
 	default:
 		log.Fatal(err)
+	}
 	}
 }

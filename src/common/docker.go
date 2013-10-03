@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+    "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,9 +40,19 @@ type httpAPI struct {
 	ip string
 }
 
+type Docker struct {
+	h *httpAPI
+}
+
 // function to initialize new http struct
 func NewHttpClient(ip string) (h *httpAPI) {
 	h = &httpAPI{ip}
+	return
+}
+
+// function to initialize new docker struct 
+func NewDocker(ip string) (D *Docker) {
+	D = &Docker{NewHttpClient(ip)}
 	return
 }
 
@@ -51,6 +62,28 @@ func (h *httpAPI) Post(url string, content string, b io.Reader) (resp *http.Resp
 
 	resp, err = c.Post("http://"+h.ip+":4243/"+url,
 		content, b)
+
+	return
+}
+
+// Post with a dictionary of header values
+func (h *httpAPI) PostHeader(url string, content string, b io.Reader, header http.Header) (resp *http.Response, err error) {
+	c := MakeHttpClient()
+
+	req, err := http.NewRequest("POST",
+		"http://"+h.ip+":4243/"+url, b)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+    req.Header = header
+    req.Header.Set("Content-TYpe", content)
+
+	resp, err = c.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 
 	return
 }
@@ -81,12 +114,15 @@ func (h *httpAPI) Delete(url string) (resp *http.Response, err error) {
 	return
 }
 
-// InspectContainer take a ip and a container id and returns its port its info
-func InspectContainer(ip string, id string) (info *containerInfo, err error) {
-	h := NewHttpClient(ip)
+func (D *Docker) GetIP() string {
+    return D.h.ip
+}
+
+// InspectContainer take a container id and returns its port its info
+func (D *Docker) InspectContainer(id string) (info *containerInfo, err error) {
 	i := &containerInfo{}
 
-	resp, err := h.Get("/containers/" + id + "/json")
+	resp, err := D.h.Get("/containers/" + id + "/json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -106,12 +142,11 @@ func InspectContainer(ip string, id string) (info *containerInfo, err error) {
 	return i, nil
 }
 
-// runImage takes a ip and a docker image to run, and makes sure it is running
-func RunImage(ip string, imagename string, hint bool) (id string, err error) {
-	h := NewHttpClient(ip)
+// runImage takes a docker image to run, and makes sure it is running
+func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 
 	e := make([]string, 1)
-	e[0] = "HOST=" + ip
+	e[0] = "HOST=" + D.h.ip
 
 	c := make(map[string]interface{})
 	c["Image"] = imagename
@@ -125,7 +160,7 @@ func RunImage(ip string, imagename string, hint bool) (id string, err error) {
 	}
 	b := bytes.NewBuffer(ba)
 
-	resp, err := h.Post("containers/create", "application/json", b)
+	resp, err := D.h.Post("containers/create", "application/json", b)
 
 	if err != nil {
 		log.Fatal(err)
@@ -149,7 +184,7 @@ func RunImage(ip string, imagename string, hint bool) (id string, err error) {
 	log.Printf("Container created id:%s", id)
 
 	b = bytes.NewBuffer([]byte("{}"))
-	resp, err = h.Post("containers/"+id+"/start", "application/json", b)
+	resp, err = D.h.Post("containers/"+id+"/start", "application/json", b)
 
 	defer resp.Body.Close()
 
@@ -166,12 +201,11 @@ func RunImage(ip string, imagename string, hint bool) (id string, err error) {
 }
 
 // Stopcontainer stops a container
-func StopContainer(ip string, container string) (err error) {
+func (D *Docker) StopContainer(container string) (err error) {
 	log.Print("Stopping container ", container)
-	h := NewHttpClient(ip)
 	b := bytes.NewBuffer(nil)
 
-	resp, err := h.Post("containers/"+container+"/stop?t=1", "application/json", b)
+	resp, err := D.h.Post("containers/"+container+"/stop?t=1", "application/json", b)
 
 	if err != nil {
 		return err
@@ -182,28 +216,27 @@ func StopContainer(ip string, container string) (err error) {
 	return nil
 }
 
-// StopImage takes a ip and a image to stop and stops it
-func StopImage(ip string, imagename string) {
+// StopImage takes a image to stop and stops it
+func (D *Docker) StopImage(imagename string) {
 	log.Print("Stopping image ", imagename)
 
-	running, id, err := ImageRunning(ip, imagename)
+	running, id, err := D.ImageRunning(imagename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if running {
-		err = StopContainer(ip, id)
+		err = D.StopContainer(id)
 		if err != nil {
 			log.Fatal(err)
 		}
-		DeleteContainer(ip, id)
+		D.DeleteContainer(id)
 	}
 }
 
-func DeleteContainer(ip string, id string) (err error) {
+func (D *Docker) DeleteContainer(id string) (err error) {
 	log.Print("deleting container ", id)
-	h := NewHttpClient(ip)
-	resp, err := h.Delete("containers/" + id)
+	resp, err := D.h.Delete("containers/" + id)
 	if err != nil {
 		return err
 	}
@@ -214,11 +247,10 @@ func DeleteContainer(ip string, id string) (err error) {
 }
 
 // TagImage tags an already existing image in the repository
-func TagImage(ip string, name string, tag string) (err error) {
-	h := NewHttpClient(ip)
+func (D *Docker) TagImage(name string, tag string) (err error) {
 	b := bytes.NewBuffer(nil)
 
-	resp, err := h.Post("images/"+name+"/tag?repo="+tag+"&force=1", "application/json", b)
+	resp, err := D.h.Post("images/"+name+"/tag?repo="+tag+"&force=1", "application/json", b)
 
 	if err != nil {
 		return err
@@ -235,12 +267,17 @@ func TagImage(ip string, name string, tag string) (err error) {
 }
 
 // PushImage pushes an image to a docker index
-func PushImage(ip string, w io.Writer, name string) (err error) {
-	h := MakeHttpClient()
-	b := bytes.NewBuffer([]byte("{}"))
+func (D *Docker) PushImage(w io.Writer, name string) (err error) {
+	b := bytes.NewBuffer(nil)
 
-	resp, err := h.Post("http://"+ip+":4243/images/"+name+"/push",
-		"application/json", b)
+    auth := base64.StdEncoding.EncodeToString([]byte("{}"))
+    header := make(http.Header)
+    header.Set("X-Registry-Auth", auth)
+
+    url := "images/"+name+"/push"
+
+	resp, err := D.h.PostHeader(url,
+		"application/json", b, header)
 	if err != nil {
 		return err
 	}
@@ -248,6 +285,13 @@ func PushImage(ip string, w io.Writer, name string) (err error) {
 	if resp.StatusCode != 200 {
 
 		_, err = io.Copy(w, resp.Body)
+        if err != nil {
+            io.WriteString(w, err.Error())
+        }
+
+        io.WriteString(w, resp.Header.Get("Location")+"\n")
+        io.WriteString(w, url + "\n")
+
 		s := fmt.Sprintf("Push image status code is not 200 it is %d",
 			resp.StatusCode)
 		return errors.New(s)
@@ -263,11 +307,10 @@ func PushImage(ip string, w io.Writer, name string) (err error) {
 }
 
 // buildImage takes a tarfile, and builds it
-func BuildImage(ip string, fd io.Reader, name string) (err error) {
+func (D *Docker) BuildImage(fd io.Reader, name string) (err error) {
 
-	h := NewHttpClient(ip)
 	v := fmt.Sprintf("%d", time.Now().Unix())
-	resp, err := h.Post("build?t="+name+"%3A"+v,
+	resp, err := D.h.Post("build?t="+name+"%3A"+v,
 		"application/tar", fd)
 
 	if err != nil {
@@ -278,14 +321,13 @@ func BuildImage(ip string, fd io.Reader, name string) (err error) {
 
 	LogReader(resp.Body)
 
-	return TagImage(ip, name+"%3A"+v, name)
+	return D.TagImage(name+"%3A"+v, name)
 }
 
 // loadImage pulls a specified image into a docker instance
-func LoadImage(ip string, imagename string) (err error) {
-	h := NewHttpClient(ip)
+func (D *Docker) LoadImage(imagename string) (err error) {
 	b := bytes.NewBuffer(nil)
-	resp, err := h.Post("images/create?fromImage="+imagename,
+	resp, err := D.h.Post("images/create?fromImage="+imagename,
 		"text", b)
 	if err != nil {
 		return err
@@ -302,9 +344,8 @@ func LoadImage(ip string, imagename string) (err error) {
 }
 
 // ListContainers gives the state for a specific docker container
-func ListContainers(ip string) (c []containerInfo, err error) {
-	h := NewHttpClient(ip)
-	resp, err := h.Get("containers/json")
+func (D *Docker) ListContainers() (c []containerInfo, err error) {
+	resp, err := D.h.Get("containers/json")
 
 	if err != nil {
 		return
@@ -326,9 +367,9 @@ func ListContainers(ip string) (c []containerInfo, err error) {
 }
 
 // ImageRunning states whether an image is running on a docker instance
-func ImageRunning(ip string, imagename string) (running bool, id string, err error) {
+func (D *Docker) ImageRunning(imagename string) (running bool, id string, err error) {
 
-	containers, err := ListContainers(ip)
+	containers, err := D.ListContainers()
 	if err != nil {
 		return false, "", err
 	}

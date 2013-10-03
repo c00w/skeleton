@@ -39,3 +39,23 @@ Everyone needs a database. There's no reason to have five different versions
 of postgresql that are all compatible with the secret server. For this reason
 skeleton ships with several databases. If you don't see yours, add a pull
 request
+
+# Ubuntu Testing Instructions
+
+Install go (from golang.org), virtualbox(from virtualbox.org), 
+vagrant(from vagrantup.com), and make (from ubuntu repos)
+
+Run make test in repository directory
+
+# Windows Testing Instructions
+
+Install mingw, go, virtualbox, vagrant
+
+Go to C:\Go\src
+Run the following in the shell
+SET GOARCH=amd64
+SET GOOS=linux
+all.bat
+
+The go to the root folder
+Run the Test.bat script
