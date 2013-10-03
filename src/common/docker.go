@@ -14,14 +14,14 @@ import (
 	"time"
 )
 
-type DockerInfo struct {
-	Ip         string
-	Containers []containerInfo
-	Images     []imageInfo
+type Docker struct {
+	h	       *httpAPI			// contains ip string
+	Containers []Container
+	Images     []Image
 	Updated    time.Time
 }
 
-type containerInfo struct {
+type Container struct {
 	Id              string
 	Image           string
 	NetworkSettings struct {
@@ -31,7 +31,7 @@ type containerInfo struct {
 	}
 }
 
-type imageInfo struct {
+type Image struct {
 	Id         string
 	Repository string
 }
@@ -40,23 +40,13 @@ type httpAPI struct {
 	ip string
 }
 
-type Docker struct {
-	h *httpAPI
-}
-
 // function to initialize new http struct
 func NewHttpClient(ip string) (h *httpAPI) {
 	h = &httpAPI{ip}
 	return
 }
 
-// function to initialize new docker struct 
-func NewDocker(ip string) (D *Docker) {
-	D = &Docker{NewHttpClient(ip)}
-	return
-}
-
-// Post function to clean up http.Post calls in code, method for http struct
+// Post function to clean up http.Post calls in code, method for HttpAPI struct
 func (h *httpAPI) Post(url string, content string, b io.Reader) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
@@ -88,7 +78,7 @@ func (h *httpAPI) PostHeader(url string, content string, b io.Reader, header htt
 	return
 }
 
-// Get function to clean up http.Get calls in code, method for http struct
+// Get function to clean up http.Get calls in code, method for HttpAPI struct
 func (h *httpAPI) Get(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
@@ -97,7 +87,7 @@ func (h *httpAPI) Get(url string) (resp *http.Response, err error) {
 	return
 }
 
-// Delete function to clean up http.NewRequest("DELETE"...) call, method for http struct
+// Delete function to clean up http.NewRequest("DELETE"...) call, method for HttpAPI struct
 func (h *httpAPI) Delete(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
@@ -114,36 +104,52 @@ func (h *httpAPI) Delete(url string) (resp *http.Response, err error) {
 	return
 }
 
+
 func (D *Docker) GetIP() string {
     return D.h.ip
 }
 
-// InspectContainer take a container id and returns its port its info
-func (D *Docker) InspectContainer(id string) (info *containerInfo, err error) {
-	i := &containerInfo{}
+// function to periodically update information in Docker struct
+func (D *Docker) Update(ip string) {
+	for ; ; time.Sleep(60 * time.Second) {
+		c, err := D.ListContainers(ip)
+		img, err := D.ListImages(ip)
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		D = Docker{&httpAPI{ip},c, img, time.Now()}
+		update <- D
+	}
+}
 
-	resp, err := D.h.Get("/containers/" + id + "/json")
+// InspectContainer takes an ip and a container id, and returns its port and its info
+func (C *Container) Inspect(ip string) (err error) {
+	h = NewHttpClient(ip)
+	C = &Container{}
+
+	resp, err := D.h.Get("/containers/" + C.Id + "/json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return i, errors.New("Inspect Container Status is not 200")
+		return errors.New("Inspect Container Status is not 200")
 	}
 
 	rall, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
-	json.Unmarshal(rall, i)
+	json.Unmarshal(rall, C)
 
 	log.Print("Container inspected")
-	return i, nil
+	return nil
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
+func (C *Container) RunImage(imagename string, hint bool) (id string, err error) {
 
 	e := make([]string, 1)
 	e[0] = "HOST=" + D.h.ip
@@ -160,7 +166,7 @@ func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 	}
 	b := bytes.NewBuffer(ba)
 
-	resp, err := D.h.Post("containers/create", "application/json", b)
+	resp, err := h.Post("containers/create", "application/json", b)
 
 	if err != nil {
 		log.Fatal(err)
@@ -177,7 +183,7 @@ func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 		return "", err
 	}
 
-	a := &containerInfo{}
+	a := &Container{}
 	json.Unmarshal(s, a)
 	id = a.Id
 
@@ -201,11 +207,11 @@ func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 }
 
 // Stopcontainer stops a container
-func (D *Docker) StopContainer(container string) (err error) {
+func (C *Container) StopContainer(ip string, container string) (err error) {
 	log.Print("Stopping container ", container)
-	b := bytes.NewBuffer(nil)
+	h = NewHttpClient(ip)
 
-	resp, err := D.h.Post("containers/"+container+"/stop?t=1", "application/json", b)
+	resp, err := h.Post("containers/"+container+"/stop?t=1", "application/json", b)
 
 	if err != nil {
 		return err
@@ -234,9 +240,10 @@ func (D *Docker) StopImage(imagename string) {
 	}
 }
 
-func (D *Docker) DeleteContainer(id string) (err error) {
-	log.Print("deleting container ", id)
-	resp, err := D.h.Delete("containers/" + id)
+func (C *Container) Delete(ip string) (err error) {
+	log.Print("deleting container ", C.Id)
+	h = NewHttpClient(ip)
+	resp, err := h.Delete("containers/" + C.Id)
 	if err != nil {
 		return err
 	}
@@ -344,7 +351,7 @@ func (D *Docker) LoadImage(imagename string) (err error) {
 }
 
 // ListContainers gives the state for a specific docker container
-func (D *Docker) ListContainers() (c []containerInfo, err error) {
+func (D *Docker) ListContainers() (c []Container, err error) {
 	resp, err := D.h.Get("containers/json")
 
 	if err != nil {
@@ -366,6 +373,29 @@ func (D *Docker) ListContainers() (c []containerInfo, err error) {
 	return
 }
 
+// ListImages gives the state of the images for a specific Docker container
+func (D *Docker) ListImages(ip string) (img []Image, err error) {
+	D.h = NewHttpClient(ip)
+	resp, err := D.h.Get("images/json")
+	
+		if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return img, errors.New("Response code is not 200")
+	}
+	
+	message, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	images := &img
+	err = json.Unmarshal(message, images)
+	return
+}
 // ImageRunning states whether an image is running on a docker instance
 func (D *Docker) ImageRunning(imagename string) (running bool, id string, err error) {
 

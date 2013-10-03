@@ -20,18 +20,6 @@ type orchestrator struct {
 	D			*common.Docker
 }
 
-func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
-	for ; ; time.Sleep(60 * time.Second) {
-		c, err := o.D.ListContainers()
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-		d := common.DockerInfo{ip, c, nil, time.Now()}
-		update <- d
-	}
-}
-
 func (o *orchestrator) StartState() {
 	d := make(map[string]common.DockerInfo)
 	o.deploystate = make(chan map[string]common.DockerInfo)
@@ -49,7 +37,7 @@ func (o *orchestrator) StartState() {
 			go o.pollDocker(ip, updatechan)
 
 		case up := <-updatechan:
-			d[up.Ip] = up
+			//d[up.Ip] = up
 		}
 	}
 }
