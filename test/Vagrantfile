@@ -10,8 +10,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     #config.vm.box_url = "http://storage.core-os.net/coreos/amd64-generic/dev-channel/coreo"
     #config.vm.box = "coreos"
     #
-    config.vm.box_url = "http://puppet-vagrant-boxes.puppetlabs.com/ubuntu-server-12042-x64-vbox4210-nocm.box"
-    config.vm.box = "ubuntu-server-12042-x64-vbox4210-nocm.box"
+    config.vm.box_url = "http://nitron-vagrant.s3-website-us-east-1.amazonaws.com/vagrant_ubuntu_12.04.3_amd64_virtualbox.box"
+    config.vm.box = "vagrant_ubuntu_12.04.3_amd64_virtualbox"
 
     config.vm.provider :virtualbox do |vb|
     vb.customize [
