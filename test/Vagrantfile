@@ -17,7 +17,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vb.customize [
         "modifyvm", :id,
         "--memory", "256",
-        "--cpus", "1"]
+        "--cpus", "2"]
     end
 
     config.vm.define :b1 do |b1|
