@@ -164,6 +164,7 @@ func main() {
 	case nil:
 		D := common.NewDocker(orch)
 		D.StopImage("orchestrator")
+		D.StopImage("gatekeeper")
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		deploy(orch, config)
 
