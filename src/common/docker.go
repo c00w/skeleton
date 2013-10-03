@@ -24,6 +24,7 @@ type Docker struct {
 type Container struct {
 	Id              string
 	Image           string
+	D				*Docker
 	NetworkSettings struct {
 		PortMapping struct {
 			Tcp map[string]string
@@ -220,11 +221,11 @@ func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
 }
 
 // StopContainer stops a container
-func (D *Docker) StopContainer(container string) (err error) {
-	log.Print("Stopping container ", container)
+func (C *Container) Stop() (err error) {
+	log.Print("Stopping container ", C.Id)
 	b := bytes.NewBuffer(nil)
 	
-	resp, err := D.h.Post("containers/"+container+"/stop?t=1", "application/json", b)
+	resp, err := D.h.Post("containers/"+ C.Id +"/stop?t=1", "application/json", b)
 
 	if err != nil {
 		return err
@@ -239,24 +240,24 @@ func (D *Docker) StopContainer(container string) (err error) {
 func (D *Docker) StopImage(imagename string) {
 	log.Print("Stopping image ", imagename)
 
-	running, id, err := D.ImageRunning(imagename)
+	running, C, err := D.ImageRunning(imagename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if running {
-		err = D.StopContainer(id)
+		err = C.Stop()
 		if err != nil {
 			log.Fatal(err)
 		}
-		D.DeleteContainer(id)
+		C.Delete()
 	}
 }
 
-func (D *Docker) DeleteContainer(id string) (err error) {
-	log.Print("deleting container ", id)
+func (C *Container) Delete() (err error) {
+	log.Print("deleting container ", C.Id)
 
-	resp, err := D.h.Delete("containers/" + id)
+	resp, err := D.h.Delete("containers/" + C.Id)
 	if err != nil {
 		return err
 	}
@@ -409,7 +410,7 @@ func (D *Docker) ListImages() (img []Image, err error) {
 	return
 }
 // ImageRunning states whether an image is running on a docker instance
-func (D *Docker) ImageRunning(imagename string) (running bool, id string, err error) {
+func (D *Docker) ImageRunning(imagename string) (running bool, c Container, err error) {
 
 	containers, err := D.ListContainers()
 	if err != nil {
@@ -418,7 +419,7 @@ func (D *Docker) ImageRunning(imagename string) (running bool, id string, err er
 
 	for _, v := range containers {
 		if strings.SplitN(v.Image, ":", 2)[0] == imagename {
-			return true, v.Id, nil
+			return true, v, nil
 		}
 	}
 	return
