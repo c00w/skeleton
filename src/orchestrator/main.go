@@ -200,60 +200,78 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 
 }
 
-func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
-	io.WriteString(w, "Starting deploy\n")
+
+func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
+    enc:= json.NewEncoder(w)
+    enc.Encode(common.Message{Message_type:"message", Message:"Starting deploy"})
+	//io.WriteString(w, "Starting deploy\n")
 	d := &common.SkeletonDeployment{}
 	c, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
-		io.WriteString(w, err.Error())
+	    enc.Encode(common.Message{Message_type:"error", Status:"500",Message:err.Error()})
+		//io.WriteString(w, err.Error())
 		return
 	}
 	err = json.Unmarshal(c, d)
 	if err != nil {
-		io.WriteString(w, err.Error())
+	    enc.Encode(common.Message{Message_type:"error",Status:"500",Message:err.Error()})
+		//io.WriteString(w, err.Error())
 		return
 	}
 
 	for _, ip := range d.Machines.Ip {
-		io.WriteString(w, "Adding ip\n")
-		io.WriteString(w, ip)
-		io.WriteString(w, "\n")
+	    enc.Encode(common.Message{Message_type:"message",
+	                        Message:("Adding ip\n"+ip+"\n")})
+		//io.WriteString(w, "Adding ip\n")
+		//io.WriteString(w, ip)
+		//io.WriteString(w, "\n")
 		o.addip <- ip
 	}
-
-	io.WriteString(w, "Waiting for image refreshes\n")
+    enc.Encode(common.Message{
+                    Message_type:"message", Message:"Waiting for image refreshes"})
+	//io.WriteString(w, "Waiting for image refreshes\n")
 	o.WaitRefresh(time.Now())
-	io.WriteString(w, "waited\n")
+	enc.Encode(common.Message{Message_type:"message",Message:"waited"})
+	//io.WriteString(w, "waited\n")
 
 	current := <-o.deploystate
 
 	diff := o.calcUpdate(w, *d, current)
 
 	sdiff := fmt.Sprint(diff)
-	io.WriteString(w, sdiff)
-	io.WriteString(w, "\n")
+	enc.Encode(common.Message{Message_type:"message",Message:sdiff})
+	//io.WriteString(w, sdiff)
+	//io.WriteString(w, "\n")
 
 	indexip := <-o.repoip
-
-	io.WriteString(w, "Deploying diff\n")
+    enc.Encode(common.Message{Message_type:"message",Message:"Deploying diff"})
+	//io.WriteString(w, "Deploying diff\n")
 	for ip, images := range diff {
 		for _, container := range images {
-			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
+			//io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
+			enc.Encode(common.Message{Message_type:"message",
+			                Message:"Deploying "+container+" on "+ip})
 			err := common.LoadImage(ip, indexip+"/"+container)
 			if err != nil {
-				io.WriteString(w, err.Error())
+			    enc.Encode(common.Message{Message_type:"error",
+			                Status:"500",Message:err.Error()})
+				//io.WriteString(w, err.Error())
 				continue
 			}
 			id, err := common.RunImage(ip, indexip+"/"+container, false)
-			io.WriteString(w, "Deployed \n")
-			io.WriteString(w, id)
-			io.WriteString(w, "\n")
+			enc.Encode(common.Message{Message_type:"message",
+			            Message:"Deployed\n"+id+"\n"})
+			//io.WriteString(w, "Deployed \n")
+			//io.WriteString(w, id)
+			//io.WriteString(w, "\n")
 			if err != nil {
-				io.WriteString(w, err.Error())
+			    enc.Encode(common.Message{Message_type:"error",Status:"500",
+			                    Message:err.Error()})
+				//io.WriteString(w, err.Error())
 			}
-			io.WriteString(w, "\n")
+			//io.WriteString(w, "\n")
 		}
 	}
 }

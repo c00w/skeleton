@@ -95,7 +95,7 @@ func bootstrapOrchestrator(ip string) string {
 }
 
 // deploy pushes our new deploy configuration to the orchestrator
-func deploy(ip string, config *common.SkeletonDeployment) {
+func deploy(ip string, config *common.SkeletonDeployment) (error) {
 
 	log.Print("Pushing images to Orchestrator")
 	h := common.MakeHttpClient()
@@ -130,10 +130,10 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 	defer resp.Body.Close()
 
 	log.Print("Deploy Pushed")
+    err = nil
+	err = common.JsonReader(resp.Body)
 
-	common.LogReader(resp.Body)
-
-	return
+	return err
 }
 
 func main() {
@@ -146,13 +146,19 @@ func main() {
 	// Initial Setup
 	case *NoOrchestratorFound:
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
-		deploy(orch, config)
+		err = deploy(orch, config)
+		if(err!=nil) {
+		    log.Fatal(err)
+		}
 
 	// Update Deploy
 	case nil:
 		common.StopImage(orch, "orchestrator")
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
-		deploy(orch, config)
+		err = deploy(orch, config)
+		if(err!=nil) {
+		    log.Fatal(err)
+		}
 
 	// Error contacting orchestrator
 	default:
