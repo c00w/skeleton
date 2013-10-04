@@ -2,7 +2,7 @@ package common
 
 import (
 	"bytes"
-    "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,7 +50,7 @@ func NewHttpClient(ip string) (h *httpAPI) {
 	return
 }
 
-// function to initialize new docker struct 
+// function to initialize new docker struct
 func NewDocker(ip string) (D *Docker) {
 	D = &Docker{NewHttpClient(ip)}
 	return
@@ -76,14 +76,13 @@ func (h *httpAPI) PostHeader(url string, content string, b io.Reader, header htt
 		log.Fatal(err)
 	}
 
-    req.Header = header
-    req.Header.Set("Content-TYpe", content)
+	req.Header = header
+	req.Header.Set("Content-TYpe", content)
 
 	resp, err = c.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 
 	return
 }
@@ -115,7 +114,7 @@ func (h *httpAPI) Delete(url string) (resp *http.Response, err error) {
 }
 
 func (D *Docker) GetIP() string {
-    return D.h.ip
+	return D.h.ip
 }
 
 // InspectContainer take a container id and returns its port its info
@@ -143,16 +142,11 @@ func (D *Docker) InspectContainer(id string) (info *containerInfo, err error) {
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (D *Docker) RunImage(imagename string, hint bool) (id string, err error) {
-
-	e := make([]string, 1)
-	e[0] = "HOST=" + D.h.ip
+func (D *Docker) RunImage(imagename string, env []string) (id string, err error) {
 
 	c := make(map[string]interface{})
 	c["Image"] = imagename
-	if hint {
-		c["Env"] = e
-	}
+	c["Env"] = env
 
 	ba, err := json.Marshal(c)
 	if err != nil {
@@ -270,11 +264,11 @@ func (D *Docker) TagImage(name string, tag string) (err error) {
 func (D *Docker) PushImage(w io.Writer, name string) (err error) {
 	b := bytes.NewBuffer(nil)
 
-    auth := base64.StdEncoding.EncodeToString([]byte("{}"))
-    header := make(http.Header)
-    header.Set("X-Registry-Auth", auth)
+	auth := base64.StdEncoding.EncodeToString([]byte("{}"))
+	header := make(http.Header)
+	header.Set("X-Registry-Auth", auth)
 
-    url := "images/"+name+"/push"
+	url := "images/" + name + "/push"
 
 	resp, err := D.h.PostHeader(url,
 		"application/json", b, header)
@@ -285,12 +279,12 @@ func (D *Docker) PushImage(w io.Writer, name string) (err error) {
 	if resp.StatusCode != 200 {
 
 		_, err = io.Copy(w, resp.Body)
-        if err != nil {
-            io.WriteString(w, err.Error())
-        }
+		if err != nil {
+			io.WriteString(w, err.Error())
+		}
 
-        io.WriteString(w, resp.Header.Get("Location")+"\n")
-        io.WriteString(w, url + "\n")
+		io.WriteString(w, resp.Header.Get("Location")+"\n")
+		io.WriteString(w, url+"\n")
 
 		s := fmt.Sprintf("Push image status code is not 200 it is %d",
 			resp.StatusCode)

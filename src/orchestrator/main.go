@@ -76,16 +76,24 @@ func (o *orchestrator) WaitRefresh(t time.Time) {
 func (o *orchestrator) StartRepository() {
 	log.Print("index setup")
 	registryName := "samalba/docker-registry"
-	o.startImage(registryName, o.repoip)
+	o.startImage(registryName, o.repoip, "5000")
 }
 
 func (o *orchestrator) StartGatekeeper() {
 	log.Print("gatekeeper setup")
 	registryName := "gatekeeper"
-	o.startImage(registryName, o.gatekeeperip)
+	o.startImage(registryName, o.gatekeeperip, "800")
 }
 
-func (o *orchestrator) startImage(registryName string, portchan chan string) {
+func (o *orchestrator) BuildEnv() []string {
+	gid := <-o.gatekeeperip
+	env := make([]string, 2)
+	env[0] = "HOST=" + os.Getenv("HOST")
+	env[1] = "GATEKEEPER=" + gid
+	return env
+}
+
+func (o *orchestrator) startImage(registryName string, portchan chan string, port string) {
 	// So that id is passed out of the function
 	id := ""
 	var err error
@@ -103,7 +111,7 @@ func (o *orchestrator) startImage(registryName string, portchan chan string) {
 				log.Print(err)
 				continue
 			}
-			id, err = o.D.RunImage(registryName, false)
+			id, err = o.D.RunImage(registryName, nil)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -114,7 +122,7 @@ func (o *orchestrator) startImage(registryName string, portchan chan string) {
 	log.Print(registryName+" running id: ", id)
 	config, err := o.D.InspectContainer(id)
 	log.Print(registryName + "fetched config")
-	port := config.NetworkSettings.PortMapping.Tcp["5000"]
+	port = config.NetworkSettings.PortMapping.Tcp[port]
 
 	host := o.D.GetIP() + ":" + port
 
@@ -252,7 +260,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				io.WriteString(w, err.Error())
 				continue
 			}
-			id, err := D.RunImage(indexip+"/"+container, false)
+			id, err := D.RunImage(indexip+"/"+container, o.BuildEnv())
 			io.WriteString(w, "Deployed \n")
 			io.WriteString(w, id)
 			io.WriteString(w, "\n")
@@ -273,6 +281,10 @@ func NewOrchestrator() (o *orchestrator) {
 	go o.StartGatekeeper()
 	o.D = common.NewDocker(os.Getenv("HOST"))
 	return o
+}
+
+func status(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "status page")
 }
 
 func main() {
