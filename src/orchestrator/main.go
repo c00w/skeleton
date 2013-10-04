@@ -87,9 +87,8 @@ func (o *orchestrator) StartGatekeeper() {
 
 func (o *orchestrator) BuildEnv() []string {
 	gid := <-o.gatekeeperip
-	env := make([]string, 2)
-	env[0] = "HOST=" + os.Getenv("HOST")
-	env[1] = "GATEKEEPER=" + gid
+	env := make([]string, 1)
+	env[0] = "GATEKEEPER=" + gid
 	return env
 }
 
