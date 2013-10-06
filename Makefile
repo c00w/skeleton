@@ -7,12 +7,15 @@ containers/gatekeeper/gatekeeper: bin/gatekeeper
 	cp bin/gatekeeper containers/gatekeeper/gatekeeper
 
 bin/skeleton: src/skeleton/*.go src/common/*.go
+	rm -f bin/skeleton
 	GOPATH=$(CURDIR) go install skeleton
 
 bin/gatekeeper: src/gatekeeper/*.go src/common/*.go
+	rm -f bin/gatekeeper
 	GOPATH=$(CURDIR) go install gatekeeper
 
 bin/orchestrator: src/orchestrator/*.go src/common/*.go
+	rm -f bin/orchestrator
 	GOPATH=$(CURDIR) go install orchestrator
 
 vagrant:
