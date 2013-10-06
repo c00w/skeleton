@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"time"
+	"flag"
 )
 
 type NoOrchestratorFound struct{}
@@ -139,6 +140,8 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 
 func main() {
 
+	flag.Parse()
+	if(flag.Args()[0]=="deploy"){
 	config := loadBonesFile()
 
 	orch, err := findOrchestrator(config)
@@ -159,5 +162,6 @@ func main() {
 	// Error contacting orchestrator
 	default:
 		log.Fatal(err)
+	}
 	}
 }

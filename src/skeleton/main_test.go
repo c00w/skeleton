@@ -26,7 +26,7 @@ func TestBonesLoading(t *testing.T) {
 		t.Error(err)
 	}
 
-	cmd := exec.Command(os.Getenv("GOPATH") + "/bin/skeleton")
+	cmd := exec.Command(os.Getenv("GOPATH") + "/bin/skeleton", "deploy")
 
 	pipe, err := cmd.StdinPipe()
 	if err != nil {
