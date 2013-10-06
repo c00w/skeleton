@@ -17,7 +17,7 @@ type orchestrator struct {
 	repoip      chan string
 	deploystate chan map[string]common.DockerInfo
 	addip       chan string
-	D			*common.Docker
+	D           *common.Docker
 }
 
 func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
@@ -105,7 +105,7 @@ func (o *orchestrator) StartRepository() {
 	log.Print("fetched config")
 	port := config.NetworkSettings.PortMapping.Tcp["5000"]
 
-    host := o.D.GetIP() + ":" + port
+	host := o.D.GetIP() + ":" + port
 
 	if err != nil {
 		log.Print(err)
@@ -118,33 +118,33 @@ func (o *orchestrator) StartRepository() {
 }
 
 func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Waiting for index to be downloaded, this may take a while")
+	enc := common.NewEncWriter(w)
+	enc.Write("Waiting for index to be downloaded, this may take a while")
 	repoip := <-o.repoip
-	io.WriteString(w, "Recieved\n")
+	enc.Write("Recieved\n")
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
-		io.WriteString(w, "Building image\n")
+		enc.Write("Building image\n")
 		err := o.D.BuildImage(r.Body, tag[0])
 		if err != nil {
-			io.WriteString(w, err.Error()+"\n")
+			enc.ErrWrite(err)
 			return
 		}
-
-		io.WriteString(w, "Tagging\n")
+		enc.Write("Tagging\n")
 		repo_tag := repoip + "/" + tag[0]
 		err = o.D.TagImage(tag[0], repo_tag)
 		if err != nil {
-			io.WriteString(w, err.Error())
+			enc.ErrWrite(err)
 			return
 		}
-		io.WriteString(w, "Pushing to index\n")
+		enc.Write("Pushing to index\n")
 		err = o.D.PushImage(w, repo_tag)
 		if err != nil {
-			io.WriteString(w, err.Error())
+			enc.ErrWrite(err)
 			return
 		}
 	}
-	io.WriteString(w, "built\n")
+	enc.Write("built")
 }
 
 func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]common.DockerInfo) (update map[string][]string) {
@@ -195,23 +195,23 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 }
 
 func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
-    enc:= common.NewEncWriter(w)
-    enc.Write("Starting deploy")
+	enc := common.NewEncWriter(w)
+	enc.Write("Starting deploy")
 	d := &common.SkeletonDeployment{}
 	c, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
-	    enc.ErrWrite(err)
+		enc.ErrWrite(err)
 		return
 	}
 	err = json.Unmarshal(c, d)
 	if err != nil {
-	    enc.ErrWrite(err)
+		enc.ErrWrite(err)
 		return
 	}
 
 	for _, ip := range d.Machines.Ip {
-	    enc.Write("Adding ip\n"+ip+"\n")
+		enc.Write("Adding ip\n" + ip + "\n")
 		o.addip <- ip
 	}
 	enc.Write("Waiting for image refreshes")
@@ -229,17 +229,17 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	enc.Write("Deploying diff")
 	for ip, images := range diff {
 		for _, container := range images {
-            D := common.NewDocker(ip)
-            enc.Write("Deploying "+container+" on "+ip)
-			err := D.LoadImage(indexip+"/"+container)
+			D := common.NewDocker(ip)
+			enc.Write("Deploying " + container + " on " + ip)
+			err := D.LoadImage(indexip + "/" + container)
 			if err != nil {
-			    enc.ErrWrite(err)
+				enc.ErrWrite(err)
 				continue
 			}
 			id, err := D.RunImage(indexip+"/"+container, false)
-			enc.Write("Deployed\n"+id+"\n")
+			enc.Write("Deployed\n" + id + "\n")
 			if err != nil {
-			    enc.ErrWrite(err)
+				enc.ErrWrite(err)
 			}
 		}
 	}
