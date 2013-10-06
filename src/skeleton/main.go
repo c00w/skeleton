@@ -83,11 +83,11 @@ func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	D := common.NewDocker(ip)
 	tar := common.TarDir("../../containers/orchestrator")
-	err := D.BuildImage(ip, tar, "orchestrator")
+	err := D.BuildImage(tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = D.RunImage(ip, "orchestrator", true)
+	_, err = D.RunImage("orchestrator", true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func main() {
 	// Update Deploy
 	case nil:
 		D := common.NewDocker(orch)
-		D.StopImage(orch, "orchestrator")
+		D.StopImage("orchestrator")
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		deploy(orch, config)
 
