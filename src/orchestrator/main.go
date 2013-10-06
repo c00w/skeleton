@@ -194,79 +194,73 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 
 }
 
+type encWriter struct {
+    encoder *json.Encoder
+    }
 
+func NewEncWriter(w io.Writer) *encWriter {
+    writer := new(encWriter)
+    writer.encoder = json.NewEncoder(w)
+    return writer
+}
+   
+func (enc *encWriter) write(s string) {
+    enc.encoder.Encode(common.Message{Message_type:"message", Message: s})
+    }
+    
+func (enc *encWriter) errWrite(err error) {
+    enc.encoder.Encode(common.Message{Message_type:"error",
+                        Status:"500",Message:err.Error()})
+    }
+//test suite
 
 func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
-    enc:= json.NewEncoder(w)
-    enc.Encode(common.Message{Message_type:"message", Message:"Starting deploy"})
-	//io.WriteString(w, "Starting deploy\n")
+    enc:= NewEncWriter(w)
+    enc.write("Starting deploy")
 	d := &common.SkeletonDeployment{}
 	c, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
-	    enc.Encode(common.Message{Message_type:"error", Status:"500",Message:err.Error()})
-		//io.WriteString(w, err.Error())
+	    enc.errWrite(err)
 		return
 	}
 	err = json.Unmarshal(c, d)
 	if err != nil {
-	    enc.Encode(common.Message{Message_type:"error",Status:"500",Message:err.Error()})
-		//io.WriteString(w, err.Error())
+	    enc.errWrite(err)
 		return
 	}
 
 	for _, ip := range d.Machines.Ip {
-	    enc.Encode(common.Message{Message_type:"message",
-	                        Message:("Adding ip\n"+ip+"\n")})
-		//io.WriteString(w, "Adding ip\n")
-		//io.WriteString(w, ip)
-		//io.WriteString(w, "\n")
+	    enc.write("Adding ip\n"+ip+"\n")
 		o.addip <- ip
 	}
-    enc.Encode(common.Message{
-                    Message_type:"message", Message:"Waiting for image refreshes"})
-	//io.WriteString(w, "Waiting for image refreshes\n")
+	enc.write("Waiting for image refreshes")
 	o.WaitRefresh(time.Now())
-	enc.Encode(common.Message{Message_type:"message",Message:"waited"})
-	//io.WriteString(w, "waited\n")
+	enc.write("waited")
 
 	current := <-o.deploystate
 
 	diff := o.calcUpdate(w, *d, current)
 
 	sdiff := fmt.Sprint(diff)
-	enc.Encode(common.Message{Message_type:"message",Message:sdiff})
-	//io.WriteString(w, sdiff)
-	//io.WriteString(w, "\n")
+	enc.write(sdiff)
 
 	indexip := <-o.repoip
-    enc.Encode(common.Message{Message_type:"message",Message:"Deploying diff"})
-	//io.WriteString(w, "Deploying diff\n")
+	enc.write("Deploying diff")
 	for ip, images := range diff {
 		for _, container := range images {
-			enc.Encode(common.Message{Message_type:"message",
-			                Message:"Deploying "+container+" on "+ip})
             D := common.NewDocker(ip)
-			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
+            enc.write("Deploying "+container+" on "+ip)
 			err := D.LoadImage(indexip+"/"+container)
 			if err != nil {
-			    enc.Encode(common.Message{Message_type:"error",
-			                Status:"500",Message:err.Error()})
-				//io.WriteString(w, err.Error())
+			    enc.errWrite(err)
 				continue
 			}
-			enc.Encode(common.Message{Message_type:"message",
-			            Message:"Deployed\n"+id+"\n"})
 			id, err := D.RunImage(indexip+"/"+container, false)
-			io.WriteString(w, "Deployed \n")
-			io.WriteString(w, id)
-			io.WriteString(w, "\n")
+			enc.write("Deployed\n"+id+"\n")
 			if err != nil {
-			    enc.Encode(common.Message{Message_type:"error",Status:"500",
-			                    Message:err.Error()})
-				//io.WriteString(w, err.Error())
+			    enc.errWrite(err)
 			}
-			//io.WriteString(w, "\n")
 		}
 	}
 }

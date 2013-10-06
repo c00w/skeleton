@@ -163,7 +163,9 @@ func main() {
 		err = deploy(orch, config)
 		if(err!=nil) {
 		    log.Fatal(err)
-		}
+		} else {
+		    log.Print("No error found")
+		    }
 
 	// Error contacting orchestrator
 	default:
