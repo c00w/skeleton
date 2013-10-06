@@ -194,72 +194,52 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 
 }
 
-type encWriter struct {
-    encoder *json.Encoder
-    }
-
-func NewEncWriter(w io.Writer) *encWriter {
-    writer := new(encWriter)
-    writer.encoder = json.NewEncoder(w)
-    return writer
-}
-   
-func (enc *encWriter) write(s string) {
-    enc.encoder.Encode(common.Message{Message_type:"message", Message: s})
-    }
-    
-func (enc *encWriter) errWrite(err error) {
-    enc.encoder.Encode(common.Message{Message_type:"error",
-                        Status:"500",Message:err.Error()})
-    }
-//test suite
-
 func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
-    enc:= NewEncWriter(w)
-    enc.write("Starting deploy")
+    enc:= common.NewEncWriter(w)
+    enc.Write("Starting deploy")
 	d := &common.SkeletonDeployment{}
 	c, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
-	    enc.errWrite(err)
+	    enc.ErrWrite(err)
 		return
 	}
 	err = json.Unmarshal(c, d)
 	if err != nil {
-	    enc.errWrite(err)
+	    enc.ErrWrite(err)
 		return
 	}
 
 	for _, ip := range d.Machines.Ip {
-	    enc.write("Adding ip\n"+ip+"\n")
+	    enc.Write("Adding ip\n"+ip+"\n")
 		o.addip <- ip
 	}
-	enc.write("Waiting for image refreshes")
+	enc.Write("Waiting for image refreshes")
 	o.WaitRefresh(time.Now())
-	enc.write("waited")
+	enc.Write("waited")
 
 	current := <-o.deploystate
 
 	diff := o.calcUpdate(w, *d, current)
 
 	sdiff := fmt.Sprint(diff)
-	enc.write(sdiff)
+	enc.Write(sdiff)
 
 	indexip := <-o.repoip
-	enc.write("Deploying diff")
+	enc.Write("Deploying diff")
 	for ip, images := range diff {
 		for _, container := range images {
             D := common.NewDocker(ip)
-            enc.write("Deploying "+container+" on "+ip)
+            enc.Write("Deploying "+container+" on "+ip)
 			err := D.LoadImage(indexip+"/"+container)
 			if err != nil {
-			    enc.errWrite(err)
+			    enc.ErrWrite(err)
 				continue
 			}
 			id, err := D.RunImage(indexip+"/"+container, false)
-			enc.write("Deployed\n"+id+"\n")
+			enc.Write("Deployed\n"+id+"\n")
 			if err != nil {
-			    enc.errWrite(err)
+			    enc.ErrWrite(err)
 			}
 		}
 	}
