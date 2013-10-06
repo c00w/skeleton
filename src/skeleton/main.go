@@ -79,16 +79,33 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 	return "", new(NoOrchestratorFound)
 }
 
+func buildEnv(ip string) []string {
+	a := make([]string, 1)
+	a[0] = "HOST=" + ip
+	return a
+}
+
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	D := common.NewDocker(ip)
+
+	//Setup orchestrator container
 	tar := common.TarDir("../../containers/orchestrator")
 	err := D.BuildImage(tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = D.RunImage("orchestrator", true)
+
+	//Setup gatekeeper container
+	tar = common.TarDir("../../containers/gatekeeper")
+	err = D.BuildImage(tar, "gatekeeper")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//Run orchestrator
+	_, err = D.RunImage("orchestrator", buildEnv(D.GetIP()))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -159,6 +176,7 @@ func main() {
 	case nil:
 		D := common.NewDocker(orch)
 		D.StopImage("orchestrator")
+		D.StopImage("gatekeeper")
 		orch = bootstrapOrchestrator(config.Machines.Ip[0])
 		err = deploy(orch, config)
 		if(err!=nil) {

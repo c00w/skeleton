@@ -35,7 +35,6 @@ func tardir(path string, write_path string, totar map[*tar.Header][]byte, top bo
 			if !top {
 				h.Name = write_path + "/" + h.Name
 			}
-			
 
 			ffd, err := os.Open(path + "/" + f.Name())
 
@@ -76,10 +75,10 @@ func TarDir(path string) io.Reader {
 	//fmt.Println(totar)
 	for k, v := range totar {
 		w.WriteHeader(k)
+		//log.Print(k.Size)
 		w.Write(v)
 	}
 
-	
 	w.Close()
 	g.Close()
 	return b
