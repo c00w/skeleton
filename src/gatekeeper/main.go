@@ -15,13 +15,10 @@ type gatekeeper struct {
 		owner       string
 		permissions map[string]bool
 	}
-
-	owners map[string]bool
 }
 
 func NewGateKeeper() (g *gatekeeper) {
 	g = new(gatekeeper)
-	g.owners = make(map[string]bool)
 	g.objects = make(map[string]struct {
 		value       string
 		owner       string
@@ -50,11 +47,6 @@ func (g *gatekeeper) Get(item, key string) (value string, err error) {
 func (g *gatekeeper) New(item, value, key string) (err error) {
 	err = errors.New("Permission Denied")
 
-	ok := g.owners[key]
-	if !ok {
-		return
-	}
-
 	v, found := g.objects[item]
 
 	if found {
@@ -72,11 +64,6 @@ func (g *gatekeeper) New(item, value, key string) (err error) {
 func (g *gatekeeper) Set(item, value, key string) (err error) {
 	err = errors.New("Permission Denied")
 
-	ok := g.owners[key]
-	if !ok {
-		return
-	}
-
 	v, found := g.objects[item]
 
 	if found && v.owner != key {
@@ -92,13 +79,25 @@ func (g *gatekeeper) Set(item, value, key string) (err error) {
 	return nil
 }
 
-func (g *gatekeeper) AddAccess(item, key, newkey string) (err error) {
+func (g *gatekeeper) Delete(item, key string) (err error) {
 	err = errors.New("Permission Denied")
 
-	ok := g.owners[key]
-	if !ok {
+	v, found := g.objects[item]
+
+	if found && v.owner != key {
 		return
 	}
+
+	if !found {
+		return
+	}
+
+	delete(g.objects, item)
+	return nil
+}
+
+func (g *gatekeeper) AddAccess(item, key, newkey string) (err error) {
+	err = errors.New("Permission Denied")
 
 	v, found := g.objects[item]
 
@@ -113,11 +112,6 @@ func (g *gatekeeper) AddAccess(item, key, newkey string) (err error) {
 
 func (g *gatekeeper) RemoveAccess(item, key, newkey string) (err error) {
 	err = errors.New("Permission Denied")
-
-	ok := g.owners[key]
-	if !ok {
-		return
-	}
 
 	v, found := g.objects[item]
 
@@ -153,6 +147,10 @@ func (g *gatekeeper) object(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		if err == nil {
 			err = g.Set(item, string(value), key)
+		}
+	case "DELETE":
+		if err == nil {
+			err = g.Delete(item, key)
 		}
 	}
 
