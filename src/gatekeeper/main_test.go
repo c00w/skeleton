@@ -7,7 +7,6 @@ import (
 
 func TestGetNewSet(t *testing.T) {
     g := NewGateKeeper()
-    g.owners["key"] = true
 
     err := g.New("name", "value", "key")
     if err != nil {
@@ -27,7 +26,6 @@ func TestGetNewSet(t *testing.T) {
 
 func TestPermission(t *testing.T) {
     g := NewGateKeeper()
-    g.owners["key"] = true
 
     err := g.New("name", "value", "key")
     if err != nil {
@@ -56,6 +54,4 @@ func TestPermission(t *testing.T) {
     if err == nil {
         t.Error(errors.New("No permission denied thrown"))
     }
-
 }
-
