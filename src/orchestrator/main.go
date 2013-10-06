@@ -14,10 +14,11 @@ import (
 )
 
 type orchestrator struct {
-	repoip      chan string
-	deploystate chan map[string]common.DockerInfo
-	addip       chan string
-	D			*common.Docker
+	repoip       chan string
+	gatekeeperip chan string
+	deploystate  chan map[string]common.DockerInfo
+	addip        chan string
+	D            *common.Docker
 }
 
 func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
@@ -74,25 +75,42 @@ func (o *orchestrator) WaitRefresh(t time.Time) {
 
 func (o *orchestrator) StartRepository() {
 	log.Print("index setup")
-	registry_name := "samalba/docker-registry"
+	registryName := "samalba/docker-registry"
+	o.startImage(registryName, o.repoip, "5000")
+}
+
+func (o *orchestrator) StartGatekeeper() {
+	log.Print("gatekeeper setup")
+	registryName := "gatekeeper"
+	o.startImage(registryName, o.gatekeeperip, "800")
+}
+
+func (o *orchestrator) BuildEnv() []string {
+	gid := <-o.gatekeeperip
+	env := make([]string, 1)
+	env[0] = "GATEKEEPER=" + gid
+	return env
+}
+
+func (o *orchestrator) startImage(registryName string, portchan chan string, port string) {
 	// So that id is passed out of the function
 	id := ""
 	var err error
 	var running bool
 	for ; ; time.Sleep(10 * time.Second) {
-		running, id, err = o.D.ImageRunning(registry_name)
+		running, id, err = o.D.ImageRunning(registryName)
 		if err != nil {
 			log.Print(err)
 			continue
 		}
 		if !running {
-			log.Print("index not running")
-			err := o.D.LoadImage(registry_name)
+			log.Print(registryName + " not running")
+			err := o.D.LoadImage(registryName)
 			if err != nil {
 				log.Print(err)
 				continue
 			}
-			id, err = o.D.RunImage(registry_name, false)
+			id, err = o.D.RunImage(registryName, nil)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -100,25 +118,25 @@ func (o *orchestrator) StartRepository() {
 		}
 		break
 	}
-	log.Print("index running id: ", id)
+	log.Print(registryName+" running id: ", id)
 	config, err := o.D.InspectContainer(id)
-	log.Print("fetched config")
-	port := config.NetworkSettings.PortMapping.Tcp["5000"]
+	log.Print(registryName + "fetched config")
+	port = config.NetworkSettings.PortMapping.Tcp[port]
 
-    host := o.D.GetIP() + ":" + port
+	host := o.D.GetIP() + ":" + port
 
 	if err != nil {
 		log.Print(err)
 	}
 
 	for {
-		o.repoip <- host
+		portchan <- host
 	}
 
 }
 
 func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Waiting for index to be downloaded, this may take a while")
+	io.WriteString(w, "Waiting for index to be downloaded, this may take a while\n")
 	repoip := <-o.repoip
 	io.WriteString(w, "Recieved\n")
 	tag := r.URL.Query()["name"]
@@ -234,14 +252,14 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Deploying diff\n")
 	for ip, images := range diff {
 		for _, container := range images {
-            D := common.NewDocker(ip)
+			D := common.NewDocker(ip)
 			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
-			err := D.LoadImage(indexip+"/"+container)
+			err := D.LoadImage(indexip + "/" + container)
 			if err != nil {
 				io.WriteString(w, err.Error())
 				continue
 			}
-			id, err := D.RunImage(indexip+"/"+container, false)
+			id, err := D.RunImage(indexip+"/"+container, o.BuildEnv())
 			io.WriteString(w, "Deployed \n")
 			io.WriteString(w, id)
 			io.WriteString(w, "\n")
@@ -256,10 +274,16 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 func NewOrchestrator() (o *orchestrator) {
 	o = new(orchestrator)
 	o.repoip = make(chan string)
+	o.gatekeeperip = make(chan string)
 	go o.StartState()
 	go o.StartRepository()
+	go o.StartGatekeeper()
 	o.D = common.NewDocker(os.Getenv("HOST"))
 	return o
+}
+
+func status(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "status page")
 }
 
 func main() {

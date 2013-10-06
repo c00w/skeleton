@@ -15,19 +15,16 @@ type gatekeeper struct {
 		owner       string
 		permissions map[string]bool
 	}
-
-	owners map[string]bool
 }
 
-func NewGateKeeper() (g * gatekeeper) {
-    g = new(gatekeeper)
-    g.owners = make(map[string]bool)
-    g.objects = make(map[string]struct {
+func NewGateKeeper() (g *gatekeeper) {
+	g = new(gatekeeper)
+	g.objects = make(map[string]struct {
 		value       string
 		owner       string
 		permissions map[string]bool
-    })
-    return g
+	})
+	return g
 
 }
 
@@ -50,33 +47,22 @@ func (g *gatekeeper) Get(item, key string) (value string, err error) {
 func (g *gatekeeper) New(item, value, key string) (err error) {
 	err = errors.New("Permission Denied")
 
-	ok := g.owners[key]
-	if !ok {
-		return
-	}
-
 	v, found := g.objects[item]
 
 	if found {
 		return
 	}
 
-    v.owner = key
-    v.permissions = make(map[string]bool)
-    v.permissions[key] = true
+	v.owner = key
+	v.permissions = make(map[string]bool)
+	v.permissions[key] = true
 	v.value = value
 	g.objects[item] = v
 	return nil
 }
 
-
 func (g *gatekeeper) Set(item, value, key string) (err error) {
 	err = errors.New("Permission Denied")
-
-	ok := g.owners[key]
-	if !ok {
-		return
-	}
 
 	v, found := g.objects[item]
 
@@ -85,7 +71,7 @@ func (g *gatekeeper) Set(item, value, key string) (err error) {
 	}
 
 	if !found {
-        return
+		return
 	}
 
 	v.value = value
@@ -93,13 +79,25 @@ func (g *gatekeeper) Set(item, value, key string) (err error) {
 	return nil
 }
 
-func (g *gatekeeper) AddAccess(item, key, newkey string) (err error) {
+func (g *gatekeeper) Delete(item, key string) (err error) {
 	err = errors.New("Permission Denied")
 
-	ok := g.owners[key]
-	if !ok {
+	v, found := g.objects[item]
+
+	if found && v.owner != key {
 		return
 	}
+
+	if !found {
+		return
+	}
+
+	delete(g.objects, item)
+	return nil
+}
+
+func (g *gatekeeper) AddAccess(item, key, newkey string) (err error) {
+	err = errors.New("Permission Denied")
 
 	v, found := g.objects[item]
 
@@ -114,11 +112,6 @@ func (g *gatekeeper) AddAccess(item, key, newkey string) (err error) {
 
 func (g *gatekeeper) RemoveAccess(item, key, newkey string) (err error) {
 	err = errors.New("Permission Denied")
-
-	ok := g.owners[key]
-	if !ok {
-		return
-	}
 
 	v, found := g.objects[item]
 
@@ -139,7 +132,7 @@ func (g *gatekeeper) object(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var v string
 
-    value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
+	value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
 
 	switch r.Method {
 
@@ -147,13 +140,17 @@ func (g *gatekeeper) object(w http.ResponseWriter, r *http.Request) {
 		v, err = g.Get(item, key)
 
 	case "PUT":
-        if err == nil {
-            err = g.New(item, string(value), key)
-        }
+		if err == nil {
+			err = g.New(item, string(value), key)
+		}
 
 	case "POST":
 		if err == nil {
 			err = g.Set(item, string(value), key)
+		}
+	case "DELETE":
+		if err == nil {
+			err = g.Delete(item, key)
 		}
 	}
 
@@ -176,7 +173,7 @@ func (g *gatekeeper) permission(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-    value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
+	value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
 
 	switch r.Method {
 
@@ -185,11 +182,11 @@ func (g *gatekeeper) permission(w http.ResponseWriter, r *http.Request) {
 			err = g.AddAccess(item, key, string(value))
 		}
 
-    case "DELETE":
-        if err == nil {
-            err = g.RemoveAccess(item, key, string(value))
-        }
-    }
+	case "DELETE":
+		if err == nil {
+			err = g.RemoveAccess(item, key, string(value))
+		}
+	}
 
 	w.Header().Set("Content-Type", "text/plain; chaset=utf-8")
 	if err != nil {
@@ -201,7 +198,6 @@ func (g *gatekeeper) permission(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-
 func main() {
 
 	g := NewGateKeeper()
@@ -211,7 +207,8 @@ func main() {
 	})
 
 	http.HandleFunc("/object/", g.object)
-	http.HandleFunc("/permissions/", g.object)
+	http.HandleFunc("/permissions/", g.permission)
 
+	log.Print("starting gatekeeper")
 	log.Fatal(http.ListenAndServe(":800", nil))
 }
