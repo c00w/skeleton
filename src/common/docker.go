@@ -36,17 +36,17 @@ type imageInfo struct {
 	Repository string
 }
 
-type httpAPI struct {
+type HttpAPI struct {
 	ip string
 }
 
 type Docker struct {
-	h *httpAPI
+	h *HttpAPI
 }
 
 // function to initialize new http struct
-func NewHttpClient(ip string) (h *httpAPI) {
-	h = &httpAPI{ip}
+func NewHttpClient(ip string) (h *HttpAPI) {
+	h = &HttpAPI{ip}
 	return
 }
 
@@ -57,7 +57,7 @@ func NewDocker(ip string) (D *Docker) {
 }
 
 // Post function to clean up http.Post calls in code, method for http struct
-func (h *httpAPI) Post(url string, content string, b io.Reader) (resp *http.Response, err error) {
+func (h *HttpAPI) Post(url string, content string, b io.Reader) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
 	resp, err = c.Post("http://"+h.ip+":4243/"+url,
@@ -67,7 +67,7 @@ func (h *httpAPI) Post(url string, content string, b io.Reader) (resp *http.Resp
 }
 
 // Post with a dictionary of header values
-func (h *httpAPI) PostHeader(url string, content string, b io.Reader, header http.Header) (resp *http.Response, err error) {
+func (h *HttpAPI) PostHeader(url string, content string, b io.Reader, header http.Header) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
 	req, err := http.NewRequest("POST",
@@ -88,7 +88,7 @@ func (h *httpAPI) PostHeader(url string, content string, b io.Reader, header htt
 }
 
 // Get function to clean up http.Get calls in code, method for http struct
-func (h *httpAPI) Get(url string) (resp *http.Response, err error) {
+func (h *HttpAPI) Get(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
 	resp, err = c.Get("http://" + h.ip + ":4243/" + url)
@@ -97,7 +97,7 @@ func (h *httpAPI) Get(url string) (resp *http.Response, err error) {
 }
 
 // Delete function to clean up http.NewRequest("DELETE"...) call, method for http struct
-func (h *httpAPI) Delete(url string) (resp *http.Response, err error) {
+func (h *HttpAPI) Delete(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
 	req, err := http.NewRequest("DELETE",
