@@ -1,10 +1,9 @@
-package main
+package common
 	
 import (
 	"os"
 	"testing"
 	"io"
-	"common"
 	"log"
 	"os/exec"
 )
@@ -16,7 +15,7 @@ func TestTarDir(t *testing.T){
 		t.Error(err)
 	}
 	//run tarDir
-	tar := common.TarDir("t0")
+	tar := TarDir("t0")
 
 	//save it
 	file, err := os.Create("test.tar.gz") 
