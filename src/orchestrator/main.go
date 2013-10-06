@@ -65,22 +65,23 @@ func (o *orchestrator) StartRepository() {
 	registry_name := "samalba/docker-registry"
 	// So that id is passed out of the function
 	id := ""
+	Img := &common.Image{}
 	var err error
 	var running bool
 	for ; ; time.Sleep(10 * time.Second) {
-		running, id, err = o.D.ImageRunning(registry_name)
+		running, id, err = Img.IsRunning(o.D, registry_name)
 		if err != nil {
 			log.Print(err)
 			continue
 		}
 		if !running {
 			log.Print("index not running")
-			err := o.D.LoadImage(registry_name)
+			err := Img.Load(o.D, registry_name)
 			if err != nil {
 				log.Print(err)
 				continue
 			}
-			id, err = o.D.RunImage(registry_name, false)
+			id, err = Img.Run(o.D, registry_name, false)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -89,9 +90,13 @@ func (o *orchestrator) StartRepository() {
 		break
 	}
 	log.Print("index running id: ", id)
-	config, err := o.D.InspectContainer(id)
+	
+	C := &common.Container{}
+	C.Id = id
+	C.D = o.D
+	err = C.Inspect()
 	log.Print("fetched config")
-	port := config.NetworkSettings.PortMapping.Tcp["5000"]
+	port := C.NetworkSettings.PortMapping.Tcp["5000"]
 
     host := o.D.GetIP() + ":" + port
 
@@ -109,10 +114,13 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Waiting for index to be downloaded, this may take a while")
 	repoip := <-o.repoip
 	io.WriteString(w, "Recieved\n")
+	
+	Img := &common.Image{}
+	
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
 		io.WriteString(w, "Building image\n")
-		err := o.D.BuildImage(r.Body, tag[0])
+		err := Img.Build(o.D, r.Body, tag[0])
 		if err != nil {
 			io.WriteString(w, err.Error()+"\n")
 			return
@@ -120,13 +128,13 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 
 		io.WriteString(w, "Tagging\n")
 		repo_tag := repoip + "/" + tag[0]
-		err = o.D.TagImage(tag[0], repo_tag)
+		err = Img.AddTag(o.D, tag[0], repo_tag)
 		if err != nil {
 			io.WriteString(w, err.Error())
 			return
 		}
 		io.WriteString(w, "Pushing to index\n")
-		err = o.D.PushImage(w, repo_tag)
+		err = Img.Push(o.D, w, repo_tag)
 		if err != nil {
 			io.WriteString(w, err.Error())
 			return
@@ -135,7 +143,7 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "built\n")
 }
 
-func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]common.DockerInfo) (update map[string][]string) {
+func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]common.Docker) (update map[string][]string) {
 	c := fmt.Sprint(current)
 	io.WriteString(w, c)
 	io.WriteString(w, "\n")
@@ -223,13 +231,15 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	for ip, images := range diff {
 		for _, container := range images {
             D := common.NewDocker(ip)
+			Img := &common.Image{}
+			
 			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
-			err := D.LoadImage(indexip+"/"+container)
+			err := Img.Load(D, indexip+"/"+container)
 			if err != nil {
 				io.WriteString(w, err.Error())
 				continue
 			}
-			id, err := D.RunImage(indexip+"/"+container, false)
+			id, err := Img.Run(D, indexip+"/"+container, false)
 			io.WriteString(w, "Deployed \n")
 			io.WriteString(w, id)
 			io.WriteString(w, "\n")
