@@ -76,6 +76,7 @@ func TarDir(path string) io.Reader {
 	//fmt.Println(totar)
 	for k, v := range totar {
 		w.WriteHeader(k)
+		//log.Print(k.Size)
 		w.Write(v)
 	}
 
