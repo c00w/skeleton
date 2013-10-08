@@ -52,7 +52,7 @@ func NewHttpClient(ip string) (h *HttpAPI) {
 
 // function to initialize new docker struct
 func NewDocker(ip string) (D *Docker) {
-	D = &Docker{NewHttpClient(ip)}
+    D = &Docker{NewHttpClient(ip+":4243")}
 	return
 }
 
@@ -60,7 +60,7 @@ func NewDocker(ip string) (D *Docker) {
 func (h *HttpAPI) Post(url string, content string, b io.Reader) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
-	resp, err = c.Post("http://"+h.ip+":4243/"+url,
+	resp, err = c.Post("http://"+h.ip+"/"+url,
 		content, b)
 
 	return
@@ -71,7 +71,7 @@ func (h *HttpAPI) PostHeader(url string, content string, b io.Reader, header htt
 	c := MakeHttpClient()
 
 	req, err := http.NewRequest("POST",
-		"http://"+h.ip+":4243/"+url, b)
+		"http://"+h.ip+"/"+url, b)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func (h *HttpAPI) PostHeader(url string, content string, b io.Reader, header htt
 func (h *HttpAPI) Get(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
-	resp, err = c.Get("http://" + h.ip + ":4243/" + url)
+	resp, err = c.Get("http://" + h.ip + "/" + url)
 
 	return
 }
@@ -101,7 +101,7 @@ func (h *HttpAPI) Delete(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
 	req, err := http.NewRequest("DELETE",
-		"http://"+h.ip+":4243/"+url, nil)
+		"http://"+h.ip+"/"+url, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

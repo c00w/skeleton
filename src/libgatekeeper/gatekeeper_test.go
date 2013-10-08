@@ -6,12 +6,14 @@ import (
 
 func TestGateKeeper(t *testing.T) {
     g := NewServer()
-    err := g.Listen(":1337")
+    go func() {
+        err := g.Listen(":1337")
+        t.Fatal(err)
+    }()
 
     c := NewClient("localhost:1337", "key")
-    err = c.Set("key.onetime", "onetimekey")
+    err := c.New("key.onetime", "onetimekey")
     if err != nil {
         t.Fatal(err)
     }
-
 }

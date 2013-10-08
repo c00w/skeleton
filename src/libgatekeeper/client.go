@@ -32,7 +32,7 @@ func NewClient(address string, key string) (g *Client) {
 }
 
 func (g *Client) Get(key string) (value string, err error) {
-	resp, err := g.h.Get("/object/" + key + "?key=" + g.key)
+	resp, err := g.h.Get("object" + key + "?key=" + g.key)
 	if err != nil {
 		return
 	}
@@ -49,7 +49,10 @@ func (g *Client) Get(key string) (value string, err error) {
 
 func (g *Client) Set(item string, value string) (err error) {
 	b := strings.NewReader(value)
-    resp, err := g.h.Post("/object/"+item+"?key="+g.key, "text/plain", b)
+    resp, err := g.h.Post("object"+item+"?key="+g.key, "text/plain", b)
+    if err != nil {
+        return
+    }
     resp.Body.Close()
     if resp.StatusCode != 200 {
         return errors.New("Status code is " + resp.Status)
@@ -58,7 +61,7 @@ func (g *Client) Set(item string, value string) (err error) {
 }
 
 func (g *Client) Delete(item string) (err error) {
-    resp, err := g.h.Delete("/object/" + item + "?key=" + g.key)
+    resp, err := g.h.Delete("object" + item + "?key=" + g.key)
     if err != nil {
         return
     }
