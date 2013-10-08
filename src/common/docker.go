@@ -66,6 +66,22 @@ func (h *HttpAPI) Post(url string, content string, b io.Reader) (resp *http.Resp
 	return
 }
 
+// Post function to clean up http.Post calls in code, method for http struct
+func (h *HttpAPI) Put(url string, content string, b io.Reader) (resp *http.Response, err error) {
+	c := MakeHttpClient()
+
+    req, err := http.NewRequest("PUT",
+                "http://"+h.ip+"/"+url, b)
+    if err != nil {
+        return
+    }
+
+	resp, err = c.Do(req)
+
+	return
+}
+
+
 // Post with a dictionary of header values
 func (h *HttpAPI) PostHeader(url string, content string, b io.Reader, header http.Header) (resp *http.Response, err error) {
 	c := MakeHttpClient()

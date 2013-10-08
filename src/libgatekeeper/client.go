@@ -60,6 +60,19 @@ func (g *Client) Set(item string, value string) (err error) {
 	return
 }
 
+func (g *Client) New(item string, value string) (err error) {
+	b := strings.NewReader(value)
+    resp, err := g.h.Put("object"+item+"?key="+g.key, "text/plain", b)
+    if err != nil {
+        return
+    }
+    resp.Body.Close()
+    if resp.StatusCode != 200 {
+        return errors.New("Status code is " + resp.Status)
+    }
+	return
+}
+
 func (g *Client) Delete(item string) (err error) {
     resp, err := g.h.Delete("object" + item + "?key=" + g.key)
     if err != nil {
