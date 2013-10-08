@@ -16,4 +16,12 @@ func TestGateKeeper(t *testing.T) {
     if err != nil {
         t.Fatal(err)
     }
+
+    v, err := c.Get("key.onetime")
+    if err != nil {
+        t.Fatal(err.Error())
+    }
+    if v != "onetimekey" {
+        t.Fatal("key is: " + v)
+    }
 }

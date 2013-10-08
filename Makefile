@@ -10,7 +10,7 @@ bin/skeleton: src/skeleton/*.go src/common/*.go
 	rm -f bin/skeleton
 	GOPATH=$(CURDIR) go install skeleton
 
-bin/gatekeeper: src/gatekeeper/*.go src/common/*.go
+bin/gatekeeper: src/gatekeeper/*.go src/common/*.go src/libgatekeeper/*.go
 	rm -f bin/gatekeeper
 	GOPATH=$(CURDIR) go install gatekeeper
 

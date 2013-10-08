@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+    "log"
 	"net/http"
 	"strings"
 )
@@ -125,8 +126,11 @@ func (g *Server) RemoveAccess(item, key, newkey string) (err error) {
 func (g *Server) object(w http.ResponseWriter, r *http.Request) {
 	key := r.FormValue("key")
 	item := r.URL.Path
+    log.Print(item)
 	s := strings.Split(item, "/")
-	item = s[len(s)]
+    log.Print(s)
+	item = s[len(s)-1]
+    log.Print("Handling")
 
 	var err error
 	var v string
