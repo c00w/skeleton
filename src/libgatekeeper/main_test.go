@@ -1,4 +1,4 @@
-package main
+package libgatekeeper
 
 import (
     "errors"
@@ -6,7 +6,7 @@ import (
 )
 
 func TestGetNewSet(t *testing.T) {
-    g := NewGateKeeper()
+    g := NewServer()
 
     err := g.New("name", "value", "key")
     if err != nil {
@@ -25,7 +25,7 @@ func TestGetNewSet(t *testing.T) {
 }
 
 func TestPermission(t *testing.T) {
-    g := NewGateKeeper()
+    g := NewServer()
 
     err := g.New("name", "value", "key")
     if err != nil {
