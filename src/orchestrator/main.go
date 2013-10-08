@@ -18,12 +18,14 @@ type orchestrator struct {
 	gatekeeperip chan string
 	deploystate  chan map[string]common.DockerInfo
 	addip        chan string
+	imageNames   map[string]string
 	D            *common.Docker
 }
 
 func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
+	D := common.NewDocker(ip)
 	for ; ; time.Sleep(60 * time.Second) {
-		c, err := o.D.ListContainers()
+		c, err := D.ListContainers()
 		if err != nil {
 			log.Print(err)
 			continue
@@ -161,6 +163,8 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, err.Error())
 			return
 		}
+
+		o.imageNames[tag[0]] = repo_tag
 	}
 	io.WriteString(w, "built\n")
 }
@@ -247,25 +251,26 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, sdiff)
 	io.WriteString(w, "\n")
 
-	indexip := <-o.repoip
-
 	io.WriteString(w, "Deploying diff\n")
 	for ip, images := range diff {
 		for _, container := range images {
 			D := common.NewDocker(ip)
 			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
-			err := D.LoadImage(indexip + "/" + container)
+			io.WriteString(w, "Indexname "+o.imageNames[container]+"\n")
+			err := D.LoadImage(o.imageNames[container])
 			if err != nil {
 				io.WriteString(w, err.Error())
+				io.WriteString(w, "\n")
 				continue
 			}
-			id, err := D.RunImage(indexip+"/"+container, o.BuildEnv())
-			io.WriteString(w, "Deployed \n")
-			io.WriteString(w, id)
-			io.WriteString(w, "\n")
+			id, err := D.RunImage(o.imageNames[container], o.BuildEnv())
 			if err != nil {
 				io.WriteString(w, err.Error())
+				io.WriteString(w, "\n")
+				continue
 			}
+			io.WriteString(w, "Deployed \n")
+			io.WriteString(w, id)
 			io.WriteString(w, "\n")
 		}
 	}
@@ -275,10 +280,11 @@ func NewOrchestrator() (o *orchestrator) {
 	o = new(orchestrator)
 	o.repoip = make(chan string)
 	o.gatekeeperip = make(chan string)
+	o.D = common.NewDocker(os.Getenv("HOST"))
+	o.imageNames = make(map[string]string)
 	go o.StartState()
 	go o.StartRepository()
 	go o.StartGatekeeper()
-	o.D = common.NewDocker(os.Getenv("HOST"))
 	return o
 }
 
