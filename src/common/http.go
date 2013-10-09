@@ -2,8 +2,8 @@ package common
 
 import (
 	"io"
-	"log"
 	"net/http"
+	"strings"
 )
 
 type HttpAPI struct {
@@ -30,17 +30,16 @@ func (h *HttpAPI) Post(url string, content string, b io.Reader) (resp *http.Resp
 func (h *HttpAPI) Put(url string, content string, b io.Reader) (resp *http.Response, err error) {
 	c := MakeHttpClient()
 
-    req, err := http.NewRequest("PUT",
-                "http://"+h.ip+"/"+url, b)
-    if err != nil {
-        return
-    }
+	req, err := http.NewRequest("PUT",
+		"http://"+h.ip+"/"+url, b)
+	if err != nil {
+		return
+	}
 
 	resp, err = c.Do(req)
 
 	return
 }
-
 
 // Post with a dictionary of header values
 func (h *HttpAPI) PostHeader(url string, content string, b io.Reader, header http.Header) (resp *http.Response, err error) {
@@ -49,17 +48,13 @@ func (h *HttpAPI) PostHeader(url string, content string, b io.Reader, header htt
 	req, err := http.NewRequest("POST",
 		"http://"+h.ip+"/"+url, b)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
 	req.Header = header
-	req.Header.Set("Content-TYpe", content)
+	req.Header.Set("Content-Type", content)
 
 	resp, err = c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	return
 }
 
@@ -75,16 +70,13 @@ func (h *HttpAPI) Get(url string) (resp *http.Response, err error) {
 // Delete function to clean up http.NewRequest("DELETE"...) call, method for http struct
 func (h *HttpAPI) Delete(url string) (resp *http.Response, err error) {
 	c := MakeHttpClient()
+	b := strings.NewReader("")
 
 	req, err := http.NewRequest("DELETE",
-		"http://"+h.ip+"/"+url, nil)
+		"http://"+h.ip+"/"+url, b)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	resp, err = c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	return
 }

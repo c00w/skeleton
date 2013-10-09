@@ -114,6 +114,25 @@ func (g *Server) AddAccess(item, key, newkey string) (err error) {
 	return nil
 }
 
+func (g *Server) SwitchOwner(item, key, newkey string) (err error) {
+	err = errors.New("Permission Denied")
+
+	v, found := g.objects[item]
+
+	if !found {
+		return
+	}
+
+	if found && v.owner != key {
+		return
+	}
+
+	v.permissions[newkey] = true
+	v.owner = newkey
+	g.objects[item] = v
+	return nil
+}
+
 func (g *Server) RemoveAccess(item, key, newkey string) (err error) {
 	err = errors.New("Permission Denied")
 
@@ -190,6 +209,11 @@ func (g *Server) permission(w http.ResponseWriter, r *http.Request) {
 	value, err := ioutil.ReadAll(http.MaxBytesReader(w, r.Body, 1000000))
 
 	switch r.Method {
+
+	case "PUT":
+		if err == nil {
+			err = g.SwitchOwner(item, key, string(value))
+		}
 
 	case "POST":
 		if err == nil {

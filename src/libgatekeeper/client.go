@@ -82,9 +82,10 @@ func (g *Client) Delete(item string) (err error) {
 	if err != nil {
 		return
 	}
+	v, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return errors.New("Status code is " + resp.Status)
+		return errors.New("Status code is " + resp.Status + "\n body is: " + string(v))
 	}
 	return
 }
@@ -92,6 +93,19 @@ func (g *Client) Delete(item string) (err error) {
 func (g *Client) AddAccess(item string, newkey string) (err error) {
 	b := strings.NewReader(newkey)
 	resp, err := g.h.Post("permissions/"+item+"?key="+g.key, "text/plain", b)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return errors.New("Status code is " + resp.Status)
+	}
+	return
+}
+
+func (g *Client) SwitchOwner(item string, newkey string) (err error) {
+	b := strings.NewReader(newkey)
+	resp, err := g.h.Put("permissions/"+item+"?key="+g.key, "text/plain", b)
 	if err != nil {
 		return
 	}

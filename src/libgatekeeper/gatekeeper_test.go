@@ -25,7 +25,7 @@ func TestGateKeeper(t *testing.T) {
 		t.Fatal("key is: " + v)
 	}
 
-	err = c.AddAccess("key.onetime", "")
+	err = c.SwitchOwner("key.onetime", "")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
