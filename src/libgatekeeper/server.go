@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-    "log"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -101,6 +101,10 @@ func (g *Server) AddAccess(item, key, newkey string) (err error) {
 
 	v, found := g.objects[item]
 
+	if !found {
+		return
+	}
+
 	if found && v.owner != key {
 		return
 	}
@@ -115,10 +119,14 @@ func (g *Server) RemoveAccess(item, key, newkey string) (err error) {
 
 	v, found := g.objects[item]
 
+	if !found {
+		return
+	}
+
 	if found && v.owner != key {
 		return
 	}
-	v.permissions[newkey] = false
+	delete(v.permissions, newkey)
 	g.objects[item] = v
 	return nil
 }
@@ -126,11 +134,11 @@ func (g *Server) RemoveAccess(item, key, newkey string) (err error) {
 func (g *Server) object(w http.ResponseWriter, r *http.Request) {
 	key := r.FormValue("key")
 	item := r.URL.Path
-    log.Print(item)
+	log.Print(item)
 	s := strings.Split(item, "/")
-    log.Print(s)
+	log.Print(s)
 	item = s[len(s)-1]
-    log.Print("Handling")
+	log.Print("Handling")
 
 	var err error
 	var v string
@@ -171,8 +179,11 @@ func (g *Server) object(w http.ResponseWriter, r *http.Request) {
 func (g *Server) permission(w http.ResponseWriter, r *http.Request) {
 	key := r.FormValue("key")
 	item := r.URL.Path
+	log.Print(item)
 	s := strings.Split(item, "/")
-	item = s[len(s)]
+	log.Print(s)
+	item = s[len(s)-1]
+	log.Print("Handling")
 
 	var err error
 
@@ -191,7 +202,7 @@ func (g *Server) permission(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "text/plain; chaset=utf-8")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if err != nil {
 		w.WriteHeader(400)
 		io.WriteString(w, err.Error())
@@ -210,6 +221,6 @@ func (g *Server) Listen(address string) (err error) {
 	http.HandleFunc("/object/", g.object)
 	http.HandleFunc("/permissions/", g.permission)
 
-    err = http.ListenAndServe(address, nil)
-    return
+	err = http.ListenAndServe(address, nil)
+	return
 }
