@@ -2,10 +2,13 @@ package main
 
 import (
 	"common"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"libgatekeeper"
 	"log"
 	"net/http"
 	"os"
@@ -19,6 +22,7 @@ type orchestrator struct {
 	deploystate  chan map[string]common.DockerInfo
 	addip        chan string
 	imageNames   map[string]string
+	key          string
 	D            *common.Docker
 }
 
@@ -87,11 +91,30 @@ func (o *orchestrator) StartGatekeeper() {
 	o.startImage(registryName, o.gatekeeperip, "800")
 }
 
-func (o *orchestrator) BuildEnv() []string {
+func (o *orchestrator) BuildEnv(ip string, container string) ([]string, error) {
 	gid := <-o.gatekeeperip
-	env := make([]string, 1)
+	env := make([]string, 2)
 	env[0] = "GATEKEEPER=" + gid
-	return env
+
+	//Create container key
+	b := make([]byte, 64)
+	for n := 0; n < 64; {
+		t, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		n += t
+	}
+	container_key := hex.EncodeToString(b[0:32])
+	onetime_key := hex.EncodeToString(b[0:32])
+	gatekeeperip := <-o.gatekeeperip
+	c := libgatekeeper.NewClient(gatekeeperip, o.key)
+	c.Set("key."+ip+"."+container, container_key)
+	c.Set("key."+onetime_key, container_key)
+	c.SwitchOwner("key."+onetime_key, "")
+	env[1] = "GATEKEEPER_KEY=" + onetime_key
+
+	return env, nil
 }
 
 func (o *orchestrator) startImage(registryName string, portchan chan string, port string) {
@@ -263,7 +286,13 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				io.WriteString(w, "\n")
 				continue
 			}
-			id, err := D.RunImage(o.imageNames[container], o.BuildEnv())
+			env, err := o.BuildEnv(ip, container)
+			if err != nil {
+				io.WriteString(w, err.Error())
+				io.WriteString(w, "\n")
+				continue
+			}
+			id, err := D.RunImage(o.imageNames[container], env)
 			if err != nil {
 				io.WriteString(w, err.Error())
 				io.WriteString(w, "\n")
@@ -282,6 +311,7 @@ func NewOrchestrator() (o *orchestrator) {
 	o.gatekeeperip = make(chan string)
 	o.D = common.NewDocker(os.Getenv("HOST"))
 	o.imageNames = make(map[string]string)
+	o.key = "orchestrator_key"
 	go o.StartState()
 	go o.StartRepository()
 	go o.StartGatekeeper()
