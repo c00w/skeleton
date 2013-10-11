@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"common"
 	"encoding/json"
+	"flag"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"time"
-	"flag"
 )
 
 type NoOrchestratorFound struct{}
@@ -79,21 +79,40 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 	return "", new(NoOrchestratorFound)
 }
 
+func buildEnv(ip string) []string {
+	a := make([]string, 1)
+	a[0] = "HOST=" + ip
+	return a
+}
+
 // bootstrapOrchestrator starts up the orchestrator on a machine
 func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	D := common.NewDocker(ip)
 	Img := &common.Image{}
+
+	//Setup orchestrator container
 	tar := common.TarDir("../../containers/orchestrator")
-	
+
 	err := Img.Build(D, tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = Img.Run(D, "orchestrator", true)
+	_, err = Img.Run(D, "orchestrator", buildEnv(D.GetIP()))
+
+	//Setup gatekeeper container
+	tar = common.TarDir("../../containers/gatekeeper")
+	err = Img.Build(D, tar, "gatekeeper")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//Run orchestrator
+	_, err = Img.Run(D, "gatekeeper", buildEnv(D.GetIP()))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log.Print("Orchestrator bootstrapped")
 	return ip
 }
@@ -143,28 +162,29 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 func main() {
 
 	flag.Parse()
-	if(flag.Args()[0]=="deploy"){
-	config := loadBonesFile()
+	if flag.Args()[0] == "deploy" {
+		config := loadBonesFile()
 
-	orch, err := findOrchestrator(config)
-	switch err.(type) {
+		orch, err := findOrchestrator(config)
+		switch err.(type) {
 
-	// Initial Setup
-	case *NoOrchestratorFound:
-		orch = bootstrapOrchestrator(config.Machines.Ip[0])
-		deploy(orch, config)
+		// Initial Setup
+		case *NoOrchestratorFound:
+			orch = bootstrapOrchestrator(config.Machines.Ip[0])
+			deploy(orch, config)
 
-	// Update Deploy
-	case nil:
-		D := common.NewDocker(orch)
-		Img := &common.Image{}
-		Img.Stop(D, "orchestrator")
-		orch = bootstrapOrchestrator(config.Machines.Ip[0])
-		deploy(orch, config)
+		// Update Deploy
+		case nil:
+			D := common.NewDocker(orch)
+			Img := &common.Image{}
+			Img.Stop(D, "orchestrator")
+			Img.Stop(D, "gatekeeper")
+			orch = bootstrapOrchestrator(config.Machines.Ip[0])
+			deploy(orch, config)
 
-	// Error contacting orchestrator
-	default:
-		log.Fatal(err)
-	}
+		// Error contacting orchestrator
+		default:
+			log.Fatal(err)
+		}
 	}
 }

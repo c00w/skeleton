@@ -2,10 +2,13 @@ package main
 
 import (
 	"common"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"libgatekeeper"
 	"log"
 	"net/http"
 	"os"
@@ -14,17 +17,19 @@ import (
 )
 
 type orchestrator struct {
-	repoip      chan string
-	deploystate chan map[string]common.Docker
-	addip       chan string
-	D			*common.Docker
+	repoip       chan string
+	gatekeeperip chan string
+	deploystate  chan map[string]*common.Docker
+	addip        chan string
+	imageNames   map[string]string
+	key          string
+	D            *common.Docker
 }
 
 func (o *orchestrator) StartState() {
-	d := make(map[string]common.Docker)
-	o.deploystate = make(chan map[string]common.Docker)
+	d := make(map[string]*common.Docker)
+	o.deploystate = make(chan map[string]*common.Docker)
 	o.addip = make(chan string)
-	updatechan := make(chan common.Docker)
 	for {
 		select {
 		case o.deploystate <- d:
@@ -32,12 +37,9 @@ func (o *orchestrator) StartState() {
 		case ip := <-o.addip:
 			_, exist := d[ip]
 			if !exist {
-				d[ip] = common.Docker{}
+				d[ip] = common.NewDocker(ip)
 			}
-			go o.pollDocker(ip, updatechan)
-
-		case up := <-updatechan:
-			//d[up.Ip] = up
+			go d[ip].Update()
 		}
 	}
 }
@@ -62,26 +64,60 @@ func (o *orchestrator) WaitRefresh(t time.Time) {
 
 func (o *orchestrator) StartRepository() {
 	log.Print("index setup")
-	registry_name := "samalba/docker-registry"
+	registryName := "samalba/docker-registry"
+	o.startImage(registryName, o.repoip, "5000")
+}
+
+func (o *orchestrator) StartGatekeeper() {
+	log.Print("gatekeeper setup")
+	registryName := "gatekeeper"
+	o.startImage(registryName, o.gatekeeperip, "800")
+}
+
+func (o *orchestrator) BuildEnv(ip string, container string) ([]string, error) {
+	gid := <-o.gatekeeperip
+	env := make([]string, 2)
+	env[0] = "GATEKEEPER=" + gid
+
+	//Create container key
+	b := make([]byte, 64)
+	for n := 0; n < 64; {
+		t, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		n += t
+	}
+	container_key := hex.EncodeToString(b[0:32])
+	onetime_key := hex.EncodeToString(b[0:32])
+	gatekeeperip := <-o.gatekeeperip
+	c := libgatekeeper.NewClient(gatekeeperip, o.key)
+	c.Set("key."+ip+"."+container, container_key)
+	c.Set("key."+onetime_key, container_key)
+	c.SwitchOwner("key."+onetime_key, "")
+	env[1] = "GATEKEEPER_KEY=" + onetime_key
+
+	return env, nil
+}
+
+func (o *orchestrator) startImage(registryName string, portchan chan string, port string) {
 	// So that id is passed out of the function
 	id := ""
 	Img := &common.Image{}
-	var err error
-	var running bool
 	for ; ; time.Sleep(10 * time.Second) {
-		running, id, err = Img.IsRunning(o.D, registry_name)
+		running, _, err := Img.IsRunning(o.D, registryName)
 		if err != nil {
 			log.Print(err)
 			continue
 		}
 		if !running {
-			log.Print("index not running")
-			err := Img.Load(o.D, registry_name)
+			log.Print(registryName + " not running")
+			err := Img.Load(o.D, registryName)
 			if err != nil {
 				log.Print(err)
 				continue
 			}
-			id, err = Img.Run(o.D, registry_name, false)
+			id, err = Img.Run(o.D, registryName, nil)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -89,34 +125,34 @@ func (o *orchestrator) StartRepository() {
 		}
 		break
 	}
-	log.Print("index running id: ", id)
-	
+
+	log.Print(registryName+" running id: ", id)
 	C := &common.Container{}
 	C.Id = id
 	C.D = o.D
-	err = C.Inspect()
-	log.Print("fetched config")
-	port := C.NetworkSettings.PortMapping.Tcp["5000"]
+	err := C.Inspect()
+	log.Print(registryName + "fetched config")
+	port = C.NetworkSettings.PortMapping.Tcp[port]
 
-    host := o.D.GetIP() + ":" + port
+	host := o.D.GetIP() + ":" + port
 
 	if err != nil {
 		log.Print(err)
 	}
 
 	for {
-		o.repoip <- host
+		portchan <- host
 	}
 
 }
 
 func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Waiting for index to be downloaded, this may take a while")
+	io.WriteString(w, "Waiting for index to be downloaded, this may take a while\n")
 	repoip := <-o.repoip
 	io.WriteString(w, "Recieved\n")
-	
+
 	Img := &common.Image{}
-	
+
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
 		io.WriteString(w, "Building image\n")
@@ -139,11 +175,13 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, err.Error())
 			return
 		}
+
+		o.imageNames[tag[0]] = repo_tag
 	}
 	io.WriteString(w, "built\n")
 }
 
-func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]common.Docker) (update map[string][]string) {
+func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]*common.Docker) (update map[string][]string) {
 	c := fmt.Sprint(current)
 	io.WriteString(w, c)
 	io.WriteString(w, "\n")
@@ -225,27 +263,37 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, sdiff)
 	io.WriteString(w, "\n")
 
-	indexip := <-o.repoip
-
 	io.WriteString(w, "Deploying diff\n")
 	for ip, images := range diff {
 		for _, container := range images {
-            D := common.NewDocker(ip)
+			D := common.NewDocker(ip)
 			Img := &common.Image{}
-			
+
 			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
-			err := Img.Load(D, indexip+"/"+container)
+			io.WriteString(w, "Indexname "+o.imageNames[container]+"\n")
+			err := Img.Load(D, o.imageNames[container])
 			if err != nil {
 				io.WriteString(w, err.Error())
+				io.WriteString(w, "\n")
 				continue
 			}
-			id, err := Img.Run(D, indexip+"/"+container, false)
-			io.WriteString(w, "Deployed \n")
-			io.WriteString(w, id)
-			io.WriteString(w, "\n")
+
+			env, err := o.BuildEnv(ip, container)
 			if err != nil {
 				io.WriteString(w, err.Error())
+				io.WriteString(w, "\n")
+				continue
 			}
+
+			id, err := Img.Run(D, o.imageNames[container], env)
+			if err != nil {
+				io.WriteString(w, err.Error())
+				io.WriteString(w, "\n")
+				continue
+			}
+
+			io.WriteString(w, "Deployed \n")
+			io.WriteString(w, id)
 			io.WriteString(w, "\n")
 		}
 	}
@@ -254,10 +302,18 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 func NewOrchestrator() (o *orchestrator) {
 	o = new(orchestrator)
 	o.repoip = make(chan string)
+	o.gatekeeperip = make(chan string)
+	o.D = common.NewDocker(os.Getenv("HOST"))
+	o.imageNames = make(map[string]string)
+	o.key = "orchestrator_key"
 	go o.StartState()
 	go o.StartRepository()
-	o.D = common.NewDocker(os.Getenv("HOST"))
+	go o.StartGatekeeper()
 	return o
+}
+
+func status(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "status page")
 }
 
 func main() {
