@@ -91,27 +91,21 @@ func bootstrapOrchestrator(ip string) string {
 	D := common.NewDocker(ip)
 	Img := &common.Image{}
 
-	//Setup orchestrator container
-	tar := common.TarDir("../../containers/orchestrator")
+	//Setup gatekeeper image
+	tar := common.TarDir("../../containers/gatekeeper")
+	err := Img.Build(D, tar, "gatekeeper")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	err := Img.Build(D, tar, "orchestrator")
+	//Setup orchestrator container
+	tar = common.TarDir("../../containers/orchestrator")
+
+	err = Img.Build(D, tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
 	_, err = Img.Run(D, "orchestrator", buildEnv(D.GetIP()))
-
-	//Setup gatekeeper container
-	tar = common.TarDir("../../containers/gatekeeper")
-	err = Img.Build(D, tar, "gatekeeper")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//Run orchestrator
-	_, err = Img.Run(D, "gatekeeper", buildEnv(D.GetIP()))
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	log.Print("Orchestrator bootstrapped")
 	return ip

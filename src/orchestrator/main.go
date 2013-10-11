@@ -102,10 +102,15 @@ func (o *orchestrator) BuildEnv(ip string, container string) ([]string, error) {
 
 func (o *orchestrator) startImage(registryName string, portchan chan string, port string) {
 	// So that id is passed out of the function
-	id := ""
 	Img := &common.Image{}
+
+	//To fix loop scoping
+	var C *common.Container
+	var running bool
+	var err error
+
 	for ; ; time.Sleep(10 * time.Second) {
-		running, _, err := Img.IsRunning(o.D, registryName)
+		running, C, err = Img.IsRunning(o.D, registryName)
 		if err != nil {
 			log.Print(err)
 			continue
@@ -117,7 +122,7 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 				log.Print(err)
 				continue
 			}
-			id, err = Img.Run(o.D, registryName, nil)
+			C, err = Img.Run(o.D, registryName, nil)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -126,12 +131,13 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 		break
 	}
 
-	log.Print(registryName+" running id: ", id)
-	C := &common.Container{}
-	C.Id = id
-	C.D = o.D
-	err := C.Inspect()
-	log.Print(registryName + "fetched config")
+	log.Print(registryName+" running id: ", C.Id)
+	err = C.Inspect()
+	if err != nil {
+		log.Print(err)
+	}
+	log.Print(registryName + " fetched config")
+	log.Print(C)
 	port = C.NetworkSettings.PortMapping.Tcp[port]
 
 	host := o.D.GetIP() + ":" + port
@@ -285,7 +291,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			id, err := Img.Run(D, o.imageNames[container], env)
+			C, err := Img.Run(D, o.imageNames[container], env)
 			if err != nil {
 				io.WriteString(w, err.Error())
 				io.WriteString(w, "\n")
@@ -293,7 +299,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 			}
 
 			io.WriteString(w, "Deployed \n")
-			io.WriteString(w, id)
+			io.WriteString(w, C.Id)
 			io.WriteString(w, "\n")
 		}
 	}

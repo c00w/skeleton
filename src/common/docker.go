@@ -87,14 +87,13 @@ func (C *Container) Inspect() (err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	json.Unmarshal(rall, C)
+	err = json.Unmarshal(rall, C)
 
-	log.Print("Container inspected")
-	return nil
+	return
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (Img *Image) Run(D *Docker, imagename string, env []string) (id string, err error) {
+func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, err error) {
 
 	c := make(map[string]interface{})
 	c["Image"] = imagename
@@ -102,7 +101,7 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (id string, err
 
 	ba, err := json.Marshal(c)
 	if err != nil {
-		return "", err
+		return
 	}
 	var b io.Reader
 	b = bytes.NewBuffer(ba)
@@ -110,28 +109,31 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (id string, err
 	resp, err := D.h.Post("containers/create", "application/json", b)
 
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
 		msg := fmt.Sprintf("Create Container Response status is %d", resp.StatusCode)
-		return "", errors.New(msg)
+		err = errors.New(msg)
+		return
 	}
 
 	s, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return
 	}
 
-	C := &Container{}
-	json.Unmarshal(s, C)
-	id = C.Id
+	err = json.Unmarshal(s, &C)
 
-	log.Printf("Container created id:%s", id)
+	if err != nil {
+		return
+	}
+
+	log.Printf("Container created id:%s", C.Id)
 
 	b = strings.NewReader("{}")
-	resp, err = D.h.Post("containers/"+id+"/start", "application/json", b)
+	resp, err = D.h.Post("containers/"+C.Id+"/start", "application/json", b)
 
 	defer resp.Body.Close()
 
@@ -139,11 +141,12 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (id string, err
 
 	if resp.StatusCode != 204 {
 		msg := fmt.Sprintf("Start Container Response status is %d", resp.StatusCode)
-		return "", errors.New(msg)
+		err = errors.New(msg)
+		return
 	}
 
 	log.Printf("Container running")
-	return id, nil
+	return
 
 }
 
