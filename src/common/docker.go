@@ -75,7 +75,7 @@ func (C *Container) Inspect() (err error) {
 
 	resp, err := C.D.h.Get("containers/" + C.Id + "/json")
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -85,10 +85,10 @@ func (C *Container) Inspect() (err error) {
 
 	rall, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	err = json.Unmarshal(rall, C)
 
+	err = json.Unmarshal(rall, C)
 	return
 }
 
@@ -125,6 +125,7 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, 
 	}
 
 	err = json.Unmarshal(s, &C)
+	C.D = D
 
 	if err != nil {
 		return
