@@ -127,7 +127,11 @@ func deploy(ip string, config *common.SkeletonDeployment) (error) {
 			log.Fatal(err)
 		}
 		defer resp.Body.Close()
-		common.LogReader(resp.Body)
+		err = common.JsonReader(resp.Body)
+		if(err!=nil) {
+		    return err
+		}
+		//start_repositry/gate
 	}
 
 	log.Print("Pushing configuration to Orchestrator")
