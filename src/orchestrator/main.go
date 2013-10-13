@@ -24,6 +24,7 @@ type orchestrator struct {
 	imageNames   map[string]string
 	key          string
 	D            *common.Docker
+	c            *libgatekeeper.Client
 }
 
 func (o *orchestrator) StartState() {
@@ -90,11 +91,9 @@ func (o *orchestrator) BuildEnv(ip string, container string) ([]string, error) {
 	}
 	container_key := hex.EncodeToString(b[0:32])
 	onetime_key := hex.EncodeToString(b[0:32])
-	gatekeeperip := <-o.gatekeeperip
-	c := libgatekeeper.NewClient(gatekeeperip, o.key)
-	c.Set("key."+ip+"."+container, container_key)
-	c.Set("key."+onetime_key, container_key)
-	c.SwitchOwner("key."+onetime_key, "")
+	o.c.Set("key."+ip+"."+container, container_key)
+	o.c.Set("key."+onetime_key, container_key)
+	o.c.SwitchOwner("key."+onetime_key, "")
 	env[1] = "GATEKEEPER_KEY=" + onetime_key
 
 	return env, nil
@@ -284,6 +283,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
+			//Sets environment variables, especially the gatekeeper key
 			env, err := o.BuildEnv(ip, container)
 			if err != nil {
 				io.WriteString(w, err.Error())
@@ -315,6 +315,10 @@ func NewOrchestrator() (o *orchestrator) {
 	go o.StartState()
 	go o.StartRepository()
 	go o.StartGatekeeper()
+	go func() {
+		gatekeeperip := <-o.gatekeeperip
+		o.c = libgatekeeper.NewClient(gatekeeperip, o.key)
+	}()
 	return o
 }
 

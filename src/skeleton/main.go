@@ -5,10 +5,12 @@ import (
 	"common"
 	"encoding/json"
 	"flag"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -40,14 +42,22 @@ func loadBonesFile() *common.SkeletonDeployment {
 	}
 
 	for k, v := range deploy.Containers {
+
+		//Granularity defaults to deployment
 		if len(v.Granularity) == 0 {
 			v.Granularity = "deployment"
-			deploy.Containers[k] = v
 		}
+
+		// Source defaults to local:<name>
+		if len(v.Source) == 0 {
+			v.Source = "local:" + k
+		}
+
+		// Set mode to default
 		if len(v.Mode) == 0 {
 			v.Mode = "default"
-			deploy.Containers[k] = v
 		}
+		deploy.Containers[k] = v
 	}
 
 	if len(deploy.Machines.Provider) == 0 {
@@ -116,9 +126,12 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 
 	log.Print("Pushing images to Orchestrator")
 	h := common.MakeHttpClient()
-
-	for k, _ := range config.Containers {
-		image := common.TarDir(k)
+	var image io.Reader
+	for k, v := range config.Containers {
+		source := strings.SplitN(v.Source, ":", 1)
+		if source[0] == "local" {
+			image = common.TarDir(source[1])
+		}
 		resp, err := h.Post("http://"+ip+":900/image?name="+k, "application/tar",
 			image)
 		if err != nil {
