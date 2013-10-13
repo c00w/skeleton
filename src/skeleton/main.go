@@ -131,7 +131,6 @@ func deploy(ip string, config *common.SkeletonDeployment) (error) {
 		if(err!=nil) {
 		    return err
 		}
-		//start_repositry/gate
 	}
 
 	log.Print("Pushing configuration to Orchestrator")
