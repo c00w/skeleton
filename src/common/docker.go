@@ -93,10 +93,10 @@ func (C *Container) Inspect() (err error) {
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, err error) {
+func (D *Docker) RunImage(Img *Image, env []string) (C *Container, err error) {
 
 	c := make(map[string]interface{})
-	c["Image"] = imagename
+	c["Image"] = Img.Tag
 	c["Env"] = env
 
 	ba, err := json.Marshal(c)
@@ -124,7 +124,7 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, 
 		return
 	}
 
-	err = json.Unmarshal(s, &C)
+	err = json.Unmarshal(s, C)
 
 	if err != nil {
 		return
@@ -169,10 +169,10 @@ func (C *Container) Stop() (err error) {
 }
 
 // StopImage takes a image to stop and stops it
-func (Img *Image) Stop(D *Docker, imagename string) {
-	log.Print("Stopping image ", imagename)
+func (Img *Image) Stop(D *Docker) {
+	log.Print("Stopping image ", Img.Tag)
 
-	running, C, err := Img.IsRunning(D, imagename)
+	running, C, err := D.ImageRunning(Img)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func (Img *Image) Push(D *Docker, w io.Writer, name string) (err error) {
 }
 
 // buildImage takes a tarfile, and builds it
-func (Img *Image) Build(D *Docker, fd io.Reader, name string) (err error) {
+func (D *Docker) BuildImage(Img *Image, fd io.Reader, name string) (err error) {
 
 	v := fmt.Sprintf("%d", time.Now().Unix())
 	resp, err := D.h.Post("build?t="+name+"%3A"+v,
@@ -278,7 +278,7 @@ func (Img *Image) Build(D *Docker, fd io.Reader, name string) (err error) {
 }
 
 // loadImage pulls a specified image into a docker instance
-func (Img *Image) Load(D *Docker, imagename string) (err error) {
+func (D *Docker) LoadImage(imagename string) (err error) {
 	b := strings.NewReader("")
 	resp, err := D.h.Post("images/create?fromImage="+imagename,
 		"text", b)
@@ -338,12 +338,12 @@ func (D *Docker) ListImages() (img []*Image, err error) {
 		return
 	}
 
-	err = json.Unmarshal(message, &img)
+	err = json.Unmarshal(message, img)
 	return
 }
 
 // ImageRunning states whether an image is running on a docker instance
-func (Img *Image) IsRunning(D *Docker, imagename string) (running bool, C *Container, err error) {
+func (D *Docker) ImageRunning(Img *Image) (running bool, C *Container, err error) {
 
 	containers, err := D.ListContainers()
 	if err != nil {
@@ -352,7 +352,7 @@ func (Img *Image) IsRunning(D *Docker, imagename string) (running bool, C *Conta
 
 	for _, v := range containers {
 		log.Print(v)
-		if strings.SplitN(v.Image, ":", 2)[0] == imagename {
+		if strings.SplitN(v.Image, ":", 2)[0] == Img.Tag {
 			return true, v, nil
 		}
 	}

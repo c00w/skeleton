@@ -103,6 +103,7 @@ func (o *orchestrator) BuildEnv(ip string, container string) ([]string, error) {
 func (o *orchestrator) startImage(registryName string, portchan chan string, port string) {
 	// So that id is passed out of the function
 	Img := &common.Image{}
+	Img.Tag = registryName
 
 	//To fix loop scoping
 	var C *common.Container
@@ -110,19 +111,19 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 	var err error
 
 	for ; ; time.Sleep(10 * time.Second) {
-		running, C, err = Img.IsRunning(o.D, registryName)
+		running, C, err = o.D.ImageRunning(Img)
 		if err != nil {
 			log.Print(err)
 			continue
 		}
 		if !running {
 			log.Print(registryName + " not running")
-			err := Img.Load(o.D, registryName)
+			err := o.D.LoadImage(registryName)
 			if err != nil {
 				log.Print(err)
 				continue
 			}
-			C, err = Img.Run(o.D, registryName, nil)
+			C, err = o.D.RunImage(Img, nil)
 			if err != nil {
 				log.Print(err)
 				continue
@@ -162,7 +163,7 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
 		io.WriteString(w, "Building image\n")
-		err := Img.Build(o.D, r.Body, tag[0])
+		err := o.D.BuildImage(Img, r.Body, tag[0])
 		if err != nil {
 			io.WriteString(w, err.Error()+"\n")
 			return
@@ -274,10 +275,11 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 		for _, container := range images {
 			D := common.NewDocker(ip)
 			Img := &common.Image{}
+			Img.Tag = o.imageNames[container]
 
 			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
 			io.WriteString(w, "Indexname "+o.imageNames[container]+"\n")
-			err := Img.Load(D, o.imageNames[container])
+			err := D.LoadImage(o.imageNames[container])
 			if err != nil {
 				io.WriteString(w, err.Error())
 				io.WriteString(w, "\n")
@@ -291,7 +293,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			C, err := Img.Run(D, o.imageNames[container], env)
+			C, err := D.RunImage(Img, env)
 			if err != nil {
 				io.WriteString(w, err.Error())
 				io.WriteString(w, "\n")

@@ -90,10 +90,11 @@ func bootstrapOrchestrator(ip string) string {
 	log.Print("Bootstrapping Orchestrator")
 	D := common.NewDocker(ip)
 	Img := &common.Image{}
+	Img.Tag = "orchestrator"
 
 	//Setup gatekeeper image
 	tar := common.TarDir("../../containers/gatekeeper")
-	err := Img.Build(D, tar, "gatekeeper")
+	err := D.BuildImage(Img, tar, "gatekeeper")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -101,11 +102,11 @@ func bootstrapOrchestrator(ip string) string {
 	//Setup orchestrator container
 	tar = common.TarDir("../../containers/orchestrator")
 
-	err = Img.Build(D, tar, "orchestrator")
+	err = D.BuildImage(Img, tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = Img.Run(D, "orchestrator", buildEnv(D.GetIP()))
+	_, err = D.RunImage(Img, buildEnv(D.GetIP()))
 
 	log.Print("Orchestrator bootstrapped")
 	return ip
@@ -171,8 +172,11 @@ func main() {
 		case nil:
 			D := common.NewDocker(orch)
 			Img := &common.Image{}
-			Img.Stop(D, "orchestrator")
-			Img.Stop(D, "gatekeeper")
+			Img.Tag = "orchestrator"
+			Img.Stop(D)
+			
+			Img.Tag = "gatekeeper"
+			Img.Stop(D)
 			orch = bootstrapOrchestrator(config.Machines.Ip[0])
 			deploy(orch, config)
 
