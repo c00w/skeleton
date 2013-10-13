@@ -212,8 +212,10 @@ func (Img *Image) AddTag(D *Docker, name string, tag string) (err error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
+		b, _ := ioutil.ReadAll(resp.Body)
 		log.Print(resp)
-		return errors.New("Code not 201")
+		log.Print(string(b))
+		return errors.New("Code not 201: " + resp.Status)
 	}
 
 	return nil

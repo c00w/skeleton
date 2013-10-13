@@ -12,11 +12,6 @@
         "hello": {
             "quantity" : 1,
             "granularity" : "machine"
-        },
-        "db": {
-            "source": "local:psql",
-            "quantity": 1,
-            "expose": ["hello"]
         }
     }
 }

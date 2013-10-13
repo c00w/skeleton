@@ -128,9 +128,11 @@ func deploy(ip string, config *common.SkeletonDeployment) {
 	h := common.MakeHttpClient()
 	var image io.Reader
 	for k, v := range config.Containers {
-		source := strings.SplitN(v.Source, ":", 1)
+		source := strings.SplitN(v.Source, ":", 2)
 		if source[0] == "local" {
 			image = common.TarDir(source[1])
+		} else {
+			log.Fatal(source)
 		}
 		resp, err := h.Post("http://"+ip+":900/image?name="+k, "application/tar",
 			image)
