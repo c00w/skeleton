@@ -122,7 +122,7 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 	}
 	o.logger.Print(registryName+" running id: ", id)
 	config, err := o.D.InspectContainer(id)
-	o.logger.Print(registryName + "fetched config")
+	o.logger.Print(registryName + " fetched config")
 	port = config.NetworkSettings.PortMapping.Tcp[port]
 
 	host := o.D.GetIP() + ":" + port
@@ -242,9 +242,10 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
 	current := <-o.deploystate
 
-	diff := o.calcUpdate(w, *d, current)
+	diff := o.calcUpdate(enc, *d, current)
 
 	sdiff := fmt.Sprint(diff)
+	enc.Log("Diff")
 	enc.Log(sdiff)
 
 	indexip := <-o.repoip
@@ -259,7 +260,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			id, err := D.RunImage(indexip+"/"+container, o.BuildEnv())
-			enc.Log("Deployed\n"+id+"\n")
+			enc.Log("Deployed\n" + id + "\n")
 			if err != nil {
 				enc.SetError(err)
 			}
