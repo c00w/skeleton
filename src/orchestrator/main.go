@@ -178,7 +178,7 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		enc.Log("Pushing to index\n")
-		err = Img.Push(o.D, w, repo_tag)
+		err = Img.Push(o.D, enc, repo_tag)
 		if err != nil {
 			enc.SetError(err)
 			return
