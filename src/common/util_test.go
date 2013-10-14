@@ -14,7 +14,7 @@ func JsonTest(t *testing.T) {
 	dec := json.NewDecoder(buff)
 	m := &Message{}
 	testString := "Throwing in a test string"
-	enc.Write(testString)
+	enc.Log(testString)
 	err := dec.Decode(m)
 	if err != nil {
 		t.Fatal("Encountered an error when trying to decode message string")
@@ -31,7 +31,7 @@ func JsonTest(t *testing.T) {
 		t.Error("Message should not be throwing a status, received " + m.Status)
 	}
 	errString := "Throwing in an error"
-	enc.ErrWrite(errors.New(errString))
+	enc.SetError(errors.New(errString))
 	err = dec.Decode(m)
 	if err != nil {
 		t.Fatal("Encountered an error when trying to decode error string")
