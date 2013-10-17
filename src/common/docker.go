@@ -30,6 +30,7 @@ type Container struct {
 			Tcp map[string]string
 		}
 	}
+	Volumes map[string]string
 }
 
 type Image struct {
@@ -98,6 +99,9 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, 
 	c := make(map[string]interface{})
 	c["Image"] = imagename
 	c["Env"] = env
+	v := make(map[string]struct{})
+	v["/foo"] = struct{}{}
+	c["Volumes"] = v
 
 	ba, err := json.Marshal(c)
 	if err != nil {
@@ -131,10 +135,17 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, 
 		return
 	}
 
+	err = C.Start()
+
+	return
+}
+
+func (C *Container) Start(binds []string) (err error) {
+
 	log.Printf("Container created id:%s", C.Id)
 
-	b = strings.NewReader("{}")
-	resp, err = D.h.Post("containers/"+C.Id+"/start", "application/json", b)
+	b := strings.NewReader("{\"Binds\":[\"/mnt:/foo\"]}")
+	resp, err := C.D.h.Post("containers/"+C.Id+"/start", "application/json", b)
 
 	defer resp.Body.Close()
 
