@@ -103,7 +103,7 @@ func bootstrapOrchestrator(ip string) string {
 
 	//Setup gatekeeper image
 	tar := common.TarDir("../../containers/gatekeeper")
-	err := Img.Build(D, tar, "gatekeeper")
+	Img, err := D.Build(tar, "gatekeeper")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -111,11 +111,14 @@ func bootstrapOrchestrator(ip string) string {
 	//Setup orchestrator container
 	tar = common.TarDir("../../containers/orchestrator")
 
-	err = Img.Build(D, tar, "orchestrator")
+	Img, err = D.Build(tar, "orchestrator")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = Img.Run(D, "orchestrator", buildEnv(D.GetIP()))
+	_, err = Img.Run(D, buildEnv(D.GetIP()))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Print("Orchestrator bootstrapped")
 	return ip

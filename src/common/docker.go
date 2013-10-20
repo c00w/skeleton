@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -31,12 +32,57 @@ type Container struct {
 		}
 	}
 	Volumes map[string]string
+	Binds   []string
 }
 
 type Image struct {
 	Id         string
 	Tag        string
 	Repository string
+	name       string
+}
+
+func NewImage(id string) (i *Image) {
+	i = new(Image)
+	i.Id = id
+	return i
+}
+
+func NewNamedImage(name string) (i *Image) {
+	i = new(Image)
+
+	// Don't bother parsing things like 1.1.1.1:4243/foo:bar
+	if len(strings.Split(name, "/")) > 1 {
+		i.name = name
+		return
+	}
+
+	if len(strings.Split(name, ":")) > 1 {
+		i.Repository = strings.Split(name, ":")[0]
+		i.Tag = strings.Split(name, ":")[1]
+	} else {
+		i.Repository = name
+		i.Tag = "latest"
+	}
+	return i
+}
+
+func (I *Image) GetName() (name string) {
+	if I.Id != "" {
+		name = I.Id
+		return
+	}
+
+	if I.Repository != "" {
+		name = I.Repository + ":" + I.Tag
+	} else {
+		name = I.Tag
+	}
+
+	if name == "" {
+		name = I.name
+	}
+	return
 }
 
 // function to initialize new Docker struct
@@ -94,10 +140,10 @@ func (C *Container) Inspect() (err error) {
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, err error) {
+func (Img *Image) Run(D *Docker, env []string) (C *Container, err error) {
 
 	c := make(map[string]interface{})
-	c["Image"] = imagename
+	c["Image"] = Img.GetName()
 	c["Env"] = env
 	v := make(map[string]struct{})
 	v["/foo"] = struct{}{}
@@ -118,6 +164,7 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
+		LogReader(resp.Body)
 		msg := fmt.Sprintf("Create Container Response status is %d", resp.StatusCode)
 		err = errors.New(msg)
 		return
@@ -128,24 +175,46 @@ func (Img *Image) Run(D *Docker, imagename string, env []string) (C *Container, 
 		return
 	}
 
-	err = json.Unmarshal(s, &C)
+	C = &Container{}
 	C.D = D
+
+	err = json.Unmarshal(s, C)
 
 	if err != nil {
 		return
 	}
+
+	C.AddBind("/mnt", "/foo")
 
 	err = C.Start()
 
 	return
 }
 
-func (C *Container) Start(binds []string) (err error) {
+func (C *Container) AddBind(host string, container string) {
+	v := host + ":" + container
+	C.Binds = append(C.Binds, v)
+	_, found := C.Volumes[container]
+	if !found {
+		if C.Volumes == nil {
+			C.Volumes = make(map[string]string)
+		}
+		C.Volumes[container] = ""
+	}
+	return
+}
+
+func (C *Container) Start() (err error) {
 
 	log.Printf("Container created id:%s", C.Id)
 
-	b := strings.NewReader("{\"Binds\":[\"/mnt:/foo\"]}")
+	bs, err := json.Marshal(C)
+	b := bytes.NewBuffer(bs)
+
 	resp, err := C.D.h.Post("containers/"+C.Id+"/start", "application/json", b)
+	if err != nil {
+		return
+	}
 
 	defer resp.Body.Close()
 
@@ -212,10 +281,13 @@ func (C *Container) Delete() (err error) {
 }
 
 // TagImage tags an already existing image in the repository
-func (Img *Image) AddTag(D *Docker, name string, tag string) (err error) {
+func (Img *Image) AddTag(D *Docker, tag string) (err error) {
 	b := strings.NewReader("")
 
-	resp, err := D.h.Post("images/"+name+"/tag?repo="+tag+"&force=1", "application/json", b)
+	tag = url.QueryEscape(tag)
+	id := url.QueryEscape(Img.GetName())
+
+	resp, err := D.h.Post("images/"+id+"/tag?repo="+tag+"&force=1", "application/json", b)
 
 	if err != nil {
 		return err
@@ -274,30 +346,35 @@ func (Img *Image) Push(D *Docker, w io.Writer, name string) (err error) {
 }
 
 // buildImage takes a tarfile, and builds it
-func (Img *Image) Build(D *Docker, fd io.Reader, name string) (err error) {
+func (D *Docker) Build(fd io.Reader, name string) (i *Image, err error) {
 
 	v := fmt.Sprintf("%d", time.Now().Unix())
 	resp, err := D.h.Post("build?t="+name+"%3A"+v,
 		"application/tar", fd)
 
 	if err != nil {
-		return err
+		return
 	}
 
 	defer resp.Body.Close()
 
+	i = &Image{}
+
 	LogReader(resp.Body)
 
-	return Img.AddTag(D, name+"%3A"+v, name)
+	i = NewNamedImage(name + ":" + v)
+
+	err = i.AddTag(D, name)
+	return
 }
 
 // loadImage pulls a specified image into a docker instance
-func (Img *Image) Load(D *Docker, imagename string) (err error) {
+func (D *Docker) Load(imagename string) (I *Image, err error) {
 	b := strings.NewReader("")
 	resp, err := D.h.Post("images/create?fromImage="+imagename,
 		"text", b)
 	if err != nil {
-		return err
+		return
 	}
 	defer resp.Body.Close()
 
@@ -307,7 +384,8 @@ func (Img *Image) Load(D *Docker, imagename string) (err error) {
 	}
 
 	log.Printf("Image fetched %s", imagename)
-	return nil
+	I = NewNamedImage(imagename)
+	return
 }
 
 // ListContainers gives the state for a specific docker container

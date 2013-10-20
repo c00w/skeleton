@@ -118,12 +118,12 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 		}
 		if !running {
 			o.logger.Print(registryName + " not running")
-			err := Img.Load(o.D, registryName)
+			Img, err := o.D.Load(registryName)
 			if err != nil {
 				o.logger.Print(err)
 				continue
 			}
-			C, err = Img.Run(o.D, registryName, nil)
+			C, err = Img.Run(o.D, nil)
 			if err != nil {
 				o.logger.Print(err)
 				continue
@@ -160,19 +160,17 @@ func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
 	repoip := <-o.repoip
 	enc.Log("Recieved\n")
 
-	Img := &common.Image{}
-
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
 		enc.Log("Building image\n")
-		err := Img.Build(o.D, r.Body, tag[0])
+		Img, err := o.D.Build(r.Body, tag[0])
 		if err != nil {
 			enc.SetError(err)
 			return
 		}
 		enc.Log("Tagging\n")
 		repo_tag := repoip + "/" + tag[0]
-		err = Img.AddTag(o.D, tag[0], repo_tag)
+		err = Img.AddTag(o.D, repo_tag)
 		if err != nil {
 			enc.SetError(err)
 			return
@@ -276,7 +274,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 
 			enc.Log("Deploying " + container + " on " + ip)
 			enc.Log("Indexname " + o.imageNames[container] + "\n")
-			err := Img.Load(D, o.imageNames[container])
+			Img, err := D.Load(o.imageNames[container])
 			if err != nil {
 				enc.SetError(err)
 				continue
@@ -289,7 +287,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			C, err := Img.Run(D, o.imageNames[container], env)
+			C, err := Img.Run(D, env)
 			if err != nil {
 				enc.SetError(err)
 				continue
