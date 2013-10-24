@@ -28,13 +28,15 @@ RUN su postgres -c "createuser -P -d -r -s docker"
 # Create test database 
 RUN su postgres -c "createdb -O docker docker"
 
-# double-check default subnet for localhost
-RUN sed s/127.0.0.1_/32/0.0.0.0_/0 /etc/postgresql/9.2/main/pg_hba.conf
 
-# double-check what the default value was
-RUN sed s/#listen/listen /etc/postgresql/9.2/main/postgresql.conf
+RUN sed 's/127.0.0.1_/32/0.0.0.0_/0' /etc/postgresql/9.2/main/pg_hba.conf
 
-## look at PostgreSQL documentation to fine-tune for security issues
+RUN sed 's/#listen/listen' /etc/postgresql/9.2/main/postgresql.conf
+RUN sed 's/localhost/*' /etc/postgresql/9.2/main/postgresql.conf
+
+# ^look at PostgreSQL documentation to fine-tune for security issues
+
+
 RUN exit
 
 
