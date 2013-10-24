@@ -286,9 +286,9 @@ func status(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "status page")
 }
 
-func listenAndServeOrchestratorTLS() error {
+func listenAndServeOrchestratorTLS(d *http.ServeMux) error {
     cert,key := common.GenerateCertificate(os.Getenv("Host"))
-    server := &http.Server{Addr: ":900", Handler: nil}
+    server := &http.Server{Addr: ":900", Handler: d}
     config := &tls.Config{}
     *config = *server.TLSConfig
     if config.NextProtos == nil {
@@ -311,7 +311,7 @@ func listenAndServeOrchestratorTLS() error {
 func main() {
 
 	o := NewOrchestrator()
-
+        
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "orchestrator v0")
 	})
@@ -320,5 +320,5 @@ func main() {
 
 	http.HandleFunc("/deploy", o.deploy)
         
-	o.logger.Fatal(listenAndServeOrchestratorTLS())
+	o.logger.Fatal(listenAndServeOrchestratorTLS(http.DefaultServeMux))
 }
