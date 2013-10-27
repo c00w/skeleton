@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"common"
 	"encoding/json"
+	"errors"
 	"flag"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
-	"errors"
 )
 
 type NoOrchestratorFound struct{}
@@ -126,108 +127,112 @@ func bootstrapOrchestrator(ip string) string {
 }
 
 // deploys the images to the server
-func deployImages(ip string, config *common.SkeletonDeployment) error {
-       log.Print("Pushing images to Orchestrator")
-        h := common.MakeHttpClient()
-        var image io.Reader
-        for k, v := range config.Containers {
-                source := strings.SplitN(v.Source, ":", 2)
-                if source[0] == "local" {
-                        image = common.TarDir(source[1])
-                } else {
-                        log.Fatal(source)
-                }
-                resp, err := h.Post("http://"+ip+":900/image?name="+k, "application/tar",
-                        image)
-                if err != nil {
-                        log.Fatal(err)
-                }
-                defer resp.Body.Close()
-                err = common.JsonReader(resp.Body)
-                if err != nil {
-                        return err
-                }
-        }
-        return nil 
+func deployImages(ip string, config *common.SkeletonDeployment) (err error) {
+	log.Print("Pushing images to Orchestrator")
+	h := common.MakeHttpClient()
+	var image io.Reader
+	var resp *http.Response
+	for k, v := range config.Containers {
+		source := strings.SplitN(v.Source, ":", 2)
+		if source[0] == "local" {
+			image = common.TarDir(source[1])
+		} else {
+			log.Fatal(source)
+		}
+		resp, err = h.Post("http://"+ip+":900/image?name="+k, "application/tar",
+			image)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+		err = common.JsonReader(resp.Body)
+		if err != nil {
+			return
+		}
+	}
+	return
 }
+
 // dpeloys the configuration to the server
-func deployConfig(ip string, config *common.SkeletonDeployment) error {
-        h := common.MakeHttpClient()
-        log.Print("Pushing configuration to Orchestrator")
+func deployConfig(ip string, config *common.SkeletonDeployment) (err error) {
+	h := common.MakeHttpClient()
+	log.Print("Pushing configuration to Orchestrator")
 
-        barr, err := json.Marshal(config)
-        if err != nil {
-                log.Fatal(err)
-        }
+	barr, err := json.Marshal(config)
+	if err != nil {
+		return
+	}
 
-        b := bytes.NewBuffer(barr)
+	b := bytes.NewBuffer(barr)
 
-        resp, err := h.Post("http://"+ip+":900/deploy", "application/json", b)
-        log.Print("Post returned")
+	resp, err := h.Post("http://"+ip+":900/deploy", "application/json", b)
+	log.Print("Post returned")
 
-        if err != nil {
-                log.Fatal(err)
-        }
+	if err != nil {
+		return
+	}
 
-        defer resp.Body.Close()
+	defer resp.Body.Close()
 
-        err = nil
-        err = common.JsonReader(resp.Body)
+	err = common.JsonReader(resp.Body)
 
-        return err        
+	return
 }
 
 // deploy pushes our new deploy configuration to the orchestrator
-func deploy(ip string, config *common.SkeletonDeployment, update string) error {
-        err := errors.New("Incorrect command entered")
-        if update == "deploy"{
-                deployImages(ip, config)
-                err = deployConfig(ip, config)
-        } else if update == "push images"{
-                err = deployImages(ip, config)
-        } else if update == "push configuration"{
-                err = deployConfig(ip, config)
-        }
-        log.Print("Deploy Pushed")
-        return err
+func deploy(ip string, config *common.SkeletonDeployment, update string) (err error) {
+	err = errors.New("Incorrect command entered")
+	if update == "deploy" {
+		err = deployImages(ip, config)
+		if err != nil {
+			return
+		}
+		err = deployConfig(ip, config)
+	} else if update == "push images" {
+		err = deployImages(ip, config)
+	} else if update == "push configuration" {
+		err = deployConfig(ip, config)
+	}
+	log.Print("Deploy Pushed")
+	return
 }
 
 func main() {
 
-        flag.Parse()
-        if flag.NArg() > 1 || (len(flag.Args())==0) {
-                log.Print("Error - bring up help flags")
-        }else if flag.Arg(0) == "v" || flag.Arg(0) == "version"{
-                log.Print("prints version number")
-        }else{
-        	config := loadBonesFile()
+	flag.Parse()
+	if flag.NArg() > 1 || (len(flag.Args()) == 0) {
+		log.Print("Error - bring up help flags")
+	} else if flag.Arg(0) == "v" || flag.Arg(0) == "version" {
+		log.Print("prints version number")
+	} else {
+		config := loadBonesFile()
 
-        	orch, err := findOrchestrator(config)
-        	switch err.(type) {
+		orch, err := findOrchestrator(config)
+		switch err.(type) {
 
-        	// Initial Setup
-        	case *NoOrchestratorFound:
-        		orch = bootstrapOrchestrator(config.Machines.Ip[0])
-        		err = deploy(orch, config, flag.Arg(0))
-        		if err != nil {
-        			log.Fatal(err)
-        		}
+		// Initial Setup
+		case *NoOrchestratorFound:
+			orch = bootstrapOrchestrator(config.Machines.Ip[0])
+			err = deploy(orch, config, flag.Arg(0))
+			if err != nil {
+				log.Fatal(err)
+			}
 
-        	// Update Deploy
-        	case nil:
-        		D := common.NewDocker(orch)
-        		Img := &common.Image{}
-        		Img.Stop(D, "orchestrator")
-        		Img.Stop(D, "gatekeeper")
-        		orch = bootstrapOrchestrator(config.Machines.Ip[0])
-        		err = deploy(orch, config, flag.Arg(0))
-        		if err != nil {
-        			log.Fatal(err)
-        		}
+		// Update Deploy
+		case nil:
+			D := common.NewDocker(orch)
+			Img := &common.Image{}
+			Img.Stop(D, "orchestrator")
+			Img.Stop(D, "gatekeeper")
+			orch = bootstrapOrchestrator(config.Machines.Ip[0])
+			err = deploy(orch, config, flag.Arg(0))
+			if err != nil {
+				log.Fatal(err)
+			}
 
-        	// Error contacting orchestrator
-        	default:
-        		log.Fatal(err)
-        	}
+		// Error contacting orchestrator
+		default:
+			log.Fatal(err)
+		}
 	}
 }
