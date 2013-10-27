@@ -10,175 +10,211 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
 
-type DockerInfo struct {
-	Ip         string
-	Containers []containerInfo
-	Images     []imageInfo
+type Docker struct {
+	h          *HttpAPI // contains ip string
+	Containers []*Container
+	Images     []*Image
 	Updated    time.Time
 }
 
-type containerInfo struct {
+type Container struct {
 	Id              string
 	Image           string
+	D               *Docker
 	NetworkSettings struct {
 		PortMapping struct {
 			Tcp map[string]string
 		}
 	}
+	Volumes map[string]string
+	Binds   []string
 }
 
-type imageInfo struct {
+type Image struct {
 	Id         string
+	Tag        string
 	Repository string
+	name       string
 }
 
-type HttpAPI struct {
-	ip string
+func NewImage(id string) (i *Image) {
+	i = new(Image)
+	i.Id = id
+	return i
 }
 
-type Docker struct {
-	h *HttpAPI
+func NewNamedImage(name string) (i *Image) {
+	i = new(Image)
+
+	// Don't bother parsing things like 1.1.1.1:4243/foo:bar
+	if len(strings.Split(name, "/")) > 1 {
+		i.name = name
+		return
+	}
+
+	if len(strings.Split(name, ":")) > 1 {
+		i.Repository = strings.Split(name, ":")[0]
+		i.Tag = strings.Split(name, ":")[1]
+	} else {
+		i.Repository = name
+		i.Tag = "latest"
+	}
+	return i
 }
 
-// function to initialize new http struct
-func NewHttpClient(ip string) (h *HttpAPI) {
-	h = &HttpAPI{ip}
+func (I *Image) GetName() (name string) {
+	if I.Id != "" {
+		name = I.Id
+		return
+	}
+
+	if I.Repository != "" {
+		name = I.Repository + ":" + I.Tag
+	} else {
+		name = I.Tag
+	}
+
+	if name == "" {
+		name = I.name
+	}
 	return
 }
 
-// function to initialize new docker struct
+// function to initialize new Docker struct
 func NewDocker(ip string) (D *Docker) {
-	D = &Docker{NewHttpClient(ip)}
-	return
-}
-
-// Post function to clean up http.Post calls in code, method for http struct
-func (h *HttpAPI) Post(url string, content string, b io.Reader) (resp *http.Response, err error) {
-	c := MakeHttpClient()
-
-	resp, err = c.Post("http://"+h.ip+":4243/"+url,
-		content, b)
-
-	return
-}
-
-// Post with a dictionary of header values
-func (h *HttpAPI) PostHeader(url string, content string, b io.Reader, header http.Header) (resp *http.Response, err error) {
-	c := MakeHttpClient()
-
-	req, err := http.NewRequest("POST",
-		"http://"+h.ip+":4243/"+url, b)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	req.Header = header
-	req.Header.Set("Content-TYpe", content)
-
-	resp, err = c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return
-}
-
-// Get function to clean up http.Get calls in code, method for http struct
-func (h *HttpAPI) Get(url string) (resp *http.Response, err error) {
-	c := MakeHttpClient()
-
-	resp, err = c.Get("http://" + h.ip + ":4243/" + url)
-
-	return
-}
-
-// Delete function to clean up http.NewRequest("DELETE"...) call, method for http struct
-func (h *HttpAPI) Delete(url string) (resp *http.Response, err error) {
-	c := MakeHttpClient()
-
-	req, err := http.NewRequest("DELETE",
-		"http://"+h.ip+":4243/"+url, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	resp, err = c.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	D = &Docker{}
+	D.h = NewHttpClient(ip + ":4243")
 	return
 }
 
 func (D *Docker) GetIP() string {
-	return D.h.ip
+	return strings.Split(D.h.ip, ":")[0]
 }
 
-// InspectContainer take a container id and returns its port its info
-func (D *Docker) InspectContainer(id string) (info *containerInfo, err error) {
-	i := &containerInfo{}
+// function to periodically update information in Docker struct
+func (D *Docker) Update() {
+	for ; ; time.Sleep(60 * time.Second) {
+		c, err := D.ListContainers()
+		if err != nil {
+			log.Print(err)
+			continue
+		}
 
-	resp, err := D.h.Get("/containers/" + id + "/json")
+		img, err := D.ListImages()
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+
+		D.Containers = c
+		D.Images = img
+		D.Updated = time.Now()
+	}
+}
+
+// InspectContainer takes a container, and returns its port and its info
+func (C *Container) Inspect() (err error) {
+
+	resp, err := C.D.h.Get("containers/" + C.Id + "/json")
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return i, errors.New("Inspect Container Status is not 200")
+		return errors.New("Inspect Container Status is not 200")
 	}
 
 	rall, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	json.Unmarshal(rall, i)
 
-	log.Print("Container inspected")
-	return i, nil
+	err = json.Unmarshal(rall, C)
+	return
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (D *Docker) RunImage(imagename string, env []string) (id string, err error) {
+func (Img *Image) Run(D *Docker, env []string) (C *Container, err error) {
 
 	c := make(map[string]interface{})
-	c["Image"] = imagename
+	c["Image"] = Img.GetName()
 	c["Env"] = env
+	v := make(map[string]struct{})
+	v["/foo"] = struct{}{}
+	c["Volumes"] = v
 
 	ba, err := json.Marshal(c)
 	if err != nil {
-		return "", err
+		return
 	}
-	b := bytes.NewBuffer(ba)
+	var b io.Reader
+	b = bytes.NewBuffer(ba)
 
 	resp, err := D.h.Post("containers/create", "application/json", b)
 
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
+		LogReader(resp.Body)
 		msg := fmt.Sprintf("Create Container Response status is %d", resp.StatusCode)
-		return "", errors.New(msg)
+		err = errors.New(msg)
+		return
 	}
 
 	s, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return
 	}
 
-	a := &containerInfo{}
-	json.Unmarshal(s, a)
-	id = a.Id
+	C = &Container{}
+	C.D = D
 
-	log.Printf("Container created id:%s", id)
+	err = json.Unmarshal(s, C)
 
-	b = bytes.NewBuffer([]byte("{}"))
-	resp, err = D.h.Post("containers/"+id+"/start", "application/json", b)
+	if err != nil {
+		return
+	}
+
+	C.AddBind("/mnt", "/foo")
+
+	err = C.Start()
+
+	return
+}
+
+func (C *Container) AddBind(host string, container string) {
+	v := host + ":" + container
+	C.Binds = append(C.Binds, v)
+	_, found := C.Volumes[container]
+	if !found {
+		if C.Volumes == nil {
+			C.Volumes = make(map[string]string)
+		}
+		C.Volumes[container] = ""
+	}
+	return
+}
+
+func (C *Container) Start() (err error) {
+
+	log.Printf("Container created id:%s", C.Id)
+
+	bs, err := json.Marshal(C)
+	b := bytes.NewBuffer(bs)
+
+	resp, err := C.D.h.Post("containers/"+C.Id+"/start", "application/json", b)
+	if err != nil {
+		return
+	}
 
 	defer resp.Body.Close()
 
@@ -186,21 +222,24 @@ func (D *Docker) RunImage(imagename string, env []string) (id string, err error)
 
 	if resp.StatusCode != 204 {
 		msg := fmt.Sprintf("Start Container Response status is %d", resp.StatusCode)
-		return "", errors.New(msg)
+		err = errors.New(msg)
+		return
 	}
 
 	log.Printf("Container running")
-	return id, nil
+	return
 
 }
 
-// Stopcontainer stops a container
-func (D *Docker) StopContainer(container string) (err error) {
-	log.Print("Stopping container ", container)
-	b := bytes.NewBuffer(nil)
+// StopContainer stops a container
+func (C *Container) Stop() (err error) {
+	log.Print("Stopping container ", C.Id)
+	b := strings.NewReader("")
 
-	resp, err := D.h.Post("containers/"+container+"/stop?t=1", "application/json", b)
+	log.Print(C.D)
+	resp, err := C.D.h.Post("containers/"+C.Id+"/stop?t=1", "application/json", b)
 
+	log.Print(resp.StatusCode)
 	if err != nil {
 		return err
 	}
@@ -211,26 +250,27 @@ func (D *Docker) StopContainer(container string) (err error) {
 }
 
 // StopImage takes a image to stop and stops it
-func (D *Docker) StopImage(imagename string) {
+func (Img *Image) Stop(D *Docker, imagename string) {
 	log.Print("Stopping image ", imagename)
 
-	running, id, err := D.ImageRunning(imagename)
+	running, C, err := Img.IsRunning(D, imagename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if running {
-		err = D.StopContainer(id)
+		err = C.Stop()
 		if err != nil {
 			log.Fatal(err)
 		}
-		D.DeleteContainer(id)
+		C.Delete()
 	}
 }
 
-func (D *Docker) DeleteContainer(id string) (err error) {
-	log.Print("deleting container ", id)
-	resp, err := D.h.Delete("containers/" + id)
+func (C *Container) Delete() (err error) {
+	log.Print("deleting container ", C.Id)
+
+	resp, err := C.D.h.Delete("containers/" + C.Id)
 	if err != nil {
 		return err
 	}
@@ -241,10 +281,13 @@ func (D *Docker) DeleteContainer(id string) (err error) {
 }
 
 // TagImage tags an already existing image in the repository
-func (D *Docker) TagImage(name string, tag string) (err error) {
-	b := bytes.NewBuffer(nil)
+func (Img *Image) AddTag(D *Docker, tag string) (err error) {
+	b := strings.NewReader("")
 
-	resp, err := D.h.Post("images/"+name+"/tag?repo="+tag+"&force=1", "application/json", b)
+	tag = url.QueryEscape(tag)
+	id := url.QueryEscape(Img.GetName())
+
+	resp, err := D.h.Post("images/"+id+"/tag?repo="+tag+"&force=1", "application/json", b)
 
 	if err != nil {
 		return err
@@ -252,8 +295,10 @@ func (D *Docker) TagImage(name string, tag string) (err error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
+		b, _ := ioutil.ReadAll(resp.Body)
 		log.Print(resp)
-		return errors.New("Code not 201")
+		log.Print(string(b))
+		return errors.New("Code not 201: " + resp.Status)
 	}
 
 	return nil
@@ -261,8 +306,8 @@ func (D *Docker) TagImage(name string, tag string) (err error) {
 }
 
 // PushImage pushes an image to a docker index
-func (D *Docker) PushImage(w io.Writer, name string) (err error) {
-	b := bytes.NewBuffer(nil)
+func (Img *Image) Push(D *Docker, w io.Writer, name string) (err error) {
+	b := strings.NewReader("")
 
 	auth := base64.StdEncoding.EncodeToString([]byte("{}"))
 	header := make(http.Header)
@@ -301,30 +346,35 @@ func (D *Docker) PushImage(w io.Writer, name string) (err error) {
 }
 
 // buildImage takes a tarfile, and builds it
-func (D *Docker) BuildImage(fd io.Reader, name string) (err error) {
+func (D *Docker) Build(fd io.Reader, name string) (i *Image, err error) {
 
 	v := fmt.Sprintf("%d", time.Now().Unix())
 	resp, err := D.h.Post("build?t="+name+"%3A"+v,
 		"application/tar", fd)
 
 	if err != nil {
-		return err
+		return
 	}
 
 	defer resp.Body.Close()
 
+	i = &Image{}
+
 	LogReader(resp.Body)
 
-	return D.TagImage(name+"%3A"+v, name)
+	i = NewNamedImage(name + ":" + v)
+
+	err = i.AddTag(D, name)
+	return
 }
 
 // loadImage pulls a specified image into a docker instance
-func (D *Docker) LoadImage(imagename string) (err error) {
-	b := bytes.NewBuffer(nil)
+func (D *Docker) Load(imagename string) (I *Image, err error) {
+	b := strings.NewReader("")
 	resp, err := D.h.Post("images/create?fromImage="+imagename,
 		"text", b)
 	if err != nil {
-		return err
+		return
 	}
 	defer resp.Body.Close()
 
@@ -334,11 +384,12 @@ func (D *Docker) LoadImage(imagename string) (err error) {
 	}
 
 	log.Printf("Image fetched %s", imagename)
-	return nil
+	I = NewNamedImage(imagename)
+	return
 }
 
 // ListContainers gives the state for a specific docker container
-func (D *Docker) ListContainers() (c []containerInfo, err error) {
+func (D *Docker) ListContainers() (c []*Container, err error) {
 	resp, err := D.h.Get("containers/json")
 
 	if err != nil {
@@ -354,23 +405,47 @@ func (D *Docker) ListContainers() (c []containerInfo, err error) {
 	if err != nil {
 		return
 	}
+	err = json.Unmarshal(message, &c)
+	for _, container := range c {
+		container.D = D
+	}
+	return c, nil
+}
 
-	containers := &c
-	err = json.Unmarshal(message, containers)
+// ListImages gives the state of the images for a specific Docker container
+func (D *Docker) ListImages() (img []*Image, err error) {
+	resp, err := D.h.Get("images/json")
+
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return img, errors.New("Response code is not 200")
+	}
+
+	message, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(message, &img)
 	return
 }
 
 // ImageRunning states whether an image is running on a docker instance
-func (D *Docker) ImageRunning(imagename string) (running bool, id string, err error) {
+func (Img *Image) IsRunning(D *Docker, imagename string) (running bool, C *Container, err error) {
 
 	containers, err := D.ListContainers()
 	if err != nil {
-		return false, "", err
+		return false, nil, err
 	}
 
 	for _, v := range containers {
+		log.Print(v)
 		if strings.SplitN(v.Image, ":", 2)[0] == imagename {
-			return true, v.Id, nil
+			return true, v, nil
 		}
 	}
 	return

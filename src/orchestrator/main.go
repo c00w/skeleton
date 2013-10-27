@@ -2,10 +2,13 @@ package main
 
 import (
 	"common"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"libgatekeeper"
 	"log"
 	"net/http"
 	"os"
@@ -16,28 +19,20 @@ import (
 type orchestrator struct {
 	repoip       chan string
 	gatekeeperip chan string
-	deploystate  chan map[string]common.DockerInfo
+	deploystate  chan map[string]*common.Docker
 	addip        chan string
+	logger       *log.Logger
+	multiplexer  *common.Multiplexer
+	imageNames   map[string]string
+	key          string
 	D            *common.Docker
-}
-
-func (o *orchestrator) pollDocker(ip string, update chan common.DockerInfo) {
-	for ; ; time.Sleep(60 * time.Second) {
-		c, err := o.D.ListContainers()
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-		d := common.DockerInfo{ip, c, nil, time.Now()}
-		update <- d
-	}
+	c            *libgatekeeper.Client
 }
 
 func (o *orchestrator) StartState() {
-	d := make(map[string]common.DockerInfo)
-	o.deploystate = make(chan map[string]common.DockerInfo)
+	d := make(map[string]*common.Docker)
+	o.deploystate = make(chan map[string]*common.Docker)
 	o.addip = make(chan string)
-	updatechan := make(chan common.DockerInfo)
 	for {
 		select {
 		case o.deploystate <- d:
@@ -45,12 +40,9 @@ func (o *orchestrator) StartState() {
 		case ip := <-o.addip:
 			_, exist := d[ip]
 			if !exist {
-				d[ip] = common.DockerInfo{}
+				d[ip] = common.NewDocker(ip)
 			}
-			go o.pollDocker(ip, updatechan)
-
-		case up := <-updatechan:
-			d[up.Ip] = up
+			go d[ip].Update()
 		}
 	}
 }
@@ -74,59 +66,84 @@ func (o *orchestrator) WaitRefresh(t time.Time) {
 }
 
 func (o *orchestrator) StartRepository() {
-	log.Print("index setup")
+	o.logger.Print("index setup")
 	registryName := "samalba/docker-registry"
 	o.startImage(registryName, o.repoip, "5000")
 }
 
 func (o *orchestrator) StartGatekeeper() {
-	log.Print("gatekeeper setup")
+	o.logger.Print("gatekeeper setup")
 	registryName := "gatekeeper"
 	o.startImage(registryName, o.gatekeeperip, "800")
 }
 
-func (o *orchestrator) BuildEnv() []string {
+func (o *orchestrator) BuildEnv(ip string, container string) ([]string, error) {
 	gid := <-o.gatekeeperip
-	env := make([]string, 1)
+	env := make([]string, 2)
 	env[0] = "GATEKEEPER=" + gid
-	return env
+
+	//Create container key
+	b := make([]byte, 64)
+	for n := 0; n < 64; {
+		t, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		n += t
+	}
+	container_key := hex.EncodeToString(b[0:32])
+	onetime_key := hex.EncodeToString(b[0:32])
+	o.c.Set("key."+ip+"."+container, container_key)
+	o.c.Set("key."+onetime_key, container_key)
+	o.c.SwitchOwner("key."+onetime_key, "")
+	env[1] = "GATEKEEPER_KEY=" + onetime_key
+
+	return env, nil
 }
 
 func (o *orchestrator) startImage(registryName string, portchan chan string, port string) {
 	// So that id is passed out of the function
-	id := ""
-	var err error
+	Img := &common.Image{}
+
+	//To fix loop scoping
+	var C *common.Container
 	var running bool
+	var err error
+
 	for ; ; time.Sleep(10 * time.Second) {
-		running, id, err = o.D.ImageRunning(registryName)
+		running, C, err = Img.IsRunning(o.D, registryName)
 		if err != nil {
-			log.Print(err)
+			o.logger.Print(err)
 			continue
 		}
 		if !running {
-			log.Print(registryName + " not running")
-			err := o.D.LoadImage(registryName)
+			o.logger.Print(registryName + " not running")
+			Img, err := o.D.Load(registryName)
 			if err != nil {
-				log.Print(err)
+				o.logger.Print(err)
 				continue
 			}
-			id, err = o.D.RunImage(registryName, nil)
+			C, err = Img.Run(o.D, nil)
 			if err != nil {
-				log.Print(err)
+				o.logger.Print(err)
 				continue
 			}
 		}
 		break
 	}
-	log.Print(registryName+" running id: ", id)
-	config, err := o.D.InspectContainer(id)
-	log.Print(registryName + "fetched config")
-	port = config.NetworkSettings.PortMapping.Tcp[port]
+	o.logger.Print(registryName+" running id: ", C.Id)
+
+	err = C.Inspect()
+	if err != nil {
+		o.logger.Print(err)
+	}
+	o.logger.Print(registryName + " fetched config")
+	port = C.NetworkSettings.PortMapping.Tcp[port]
 
 	host := o.D.GetIP() + ":" + port
 
 	if err != nil {
-		log.Print(err)
+		o.logger.Print(err)
 	}
 
 	for {
@@ -136,36 +153,41 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 }
 
 func (o *orchestrator) handleImage(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Waiting for index to be downloaded, this may take a while\n")
+	enc := common.NewEncWriter(w)
+	o.multiplexer.Attach(enc)
+	defer o.multiplexer.Detach(enc)
+	enc.Log("Waiting for index to be downloaded, this may take a while")
 	repoip := <-o.repoip
-	io.WriteString(w, "Recieved\n")
+	enc.Log("Recieved\n")
+
 	tag := r.URL.Query()["name"]
 	if len(tag) > 0 {
-		io.WriteString(w, "Building image\n")
-		err := o.D.BuildImage(r.Body, tag[0])
+		enc.Log("Building image\n")
+		Img, err := o.D.Build(r.Body, tag[0])
 		if err != nil {
-			io.WriteString(w, err.Error()+"\n")
+			enc.SetError(err)
+			return
+		}
+		enc.Log("Tagging\n")
+		repo_tag := repoip + "/" + tag[0]
+		err = Img.AddTag(o.D, repo_tag)
+		if err != nil {
+			enc.SetError(err)
+			return
+		}
+		enc.Log("Pushing to index\n")
+		err = Img.Push(o.D, enc, repo_tag)
+		if err != nil {
+			enc.SetError(err)
 			return
 		}
 
-		io.WriteString(w, "Tagging\n")
-		repo_tag := repoip + "/" + tag[0]
-		err = o.D.TagImage(tag[0], repo_tag)
-		if err != nil {
-			io.WriteString(w, err.Error())
-			return
-		}
-		io.WriteString(w, "Pushing to index\n")
-		err = o.D.PushImage(w, repo_tag)
-		if err != nil {
-			io.WriteString(w, err.Error())
-			return
-		}
+		o.imageNames[tag[0]] = repo_tag
 	}
-	io.WriteString(w, "built\n")
+	enc.Log("built")
 }
 
-func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]common.DockerInfo) (update map[string][]string) {
+func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment, current map[string]*common.Docker) (update map[string][]string) {
 	c := fmt.Sprint(current)
 	io.WriteString(w, c)
 	io.WriteString(w, "\n")
@@ -213,72 +235,85 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 }
 
 func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
-
-	io.WriteString(w, "Starting deploy\n")
+	enc := common.NewEncWriter(w)
+	enc.Log("Starting deploy")
 	d := &common.SkeletonDeployment{}
 	c, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
-		io.WriteString(w, err.Error())
+		enc.SetError(err)
 		return
 	}
 	err = json.Unmarshal(c, d)
 	if err != nil {
-		io.WriteString(w, err.Error())
+		enc.SetError(err)
 		return
 	}
 
 	for _, ip := range d.Machines.Ip {
-		io.WriteString(w, "Adding ip\n")
-		io.WriteString(w, ip)
-		io.WriteString(w, "\n")
+		enc.Log("Adding ip\n" + ip + "\n")
 		o.addip <- ip
 	}
-
-	io.WriteString(w, "Waiting for image refreshes\n")
+	enc.Log("Waiting for image refreshes")
 	o.WaitRefresh(time.Now())
-	io.WriteString(w, "waited\n")
+	enc.Log("waited")
 
 	current := <-o.deploystate
 
-	diff := o.calcUpdate(w, *d, current)
+	diff := o.calcUpdate(enc, *d, current)
 
 	sdiff := fmt.Sprint(diff)
-	io.WriteString(w, sdiff)
-	io.WriteString(w, "\n")
+	enc.Log("Diff")
+	enc.Log(sdiff)
 
-	indexip := <-o.repoip
-
-	io.WriteString(w, "Deploying diff\n")
+	enc.Log("Deploying diff")
 	for ip, images := range diff {
 		for _, container := range images {
 			D := common.NewDocker(ip)
-			io.WriteString(w, "Deploying "+container+" on "+ip+"\n")
-			err := D.LoadImage(indexip + "/" + container)
+			Img := &common.Image{}
+
+			enc.Log("Deploying " + container + " on " + ip)
+			enc.Log("Indexname " + o.imageNames[container] + "\n")
+			Img, err := D.Load(o.imageNames[container])
 			if err != nil {
-				io.WriteString(w, err.Error())
+				enc.SetError(err)
 				continue
 			}
-			id, err := D.RunImage(indexip+"/"+container, o.BuildEnv())
-			io.WriteString(w, "Deployed \n")
-			io.WriteString(w, id)
-			io.WriteString(w, "\n")
+
+			//Sets environment variables, especially the gatekeeper key
+			env, err := o.BuildEnv(ip, container)
 			if err != nil {
-				io.WriteString(w, err.Error())
+				enc.SetError(err)
+				continue
 			}
-			io.WriteString(w, "\n")
+
+			C, err := Img.Run(D, env)
+			if err != nil {
+				enc.SetError(err)
+				continue
+			}
+
+			enc.Log("Deployed\n" + C.Id + "\n")
 		}
 	}
 }
 
 func NewOrchestrator() (o *orchestrator) {
 	o = new(orchestrator)
+	o.D = common.NewDocker(os.Getenv("HOST"))
 	o.repoip = make(chan string)
 	o.gatekeeperip = make(chan string)
+	o.multiplexer = common.NewMultiplexer()
+	o.logger = log.New(o.multiplexer, "", 0)
+	o.imageNames = make(map[string]string)
+	o.key = "orchestrator_key"
 	go o.StartState()
 	go o.StartRepository()
 	go o.StartGatekeeper()
-	o.D = common.NewDocker(os.Getenv("HOST"))
+	go func() {
+		gatekeeperip := <-o.gatekeeperip
+		o.c = libgatekeeper.NewClient(gatekeeperip, o.key)
+	}()
 	return o
 }
 
@@ -298,5 +333,5 @@ func main() {
 
 	http.HandleFunc("/deploy", o.deploy)
 
-	log.Fatal(http.ListenAndServe(":900", nil))
+	o.logger.Fatal(http.ListenAndServe(":900", nil))
 }

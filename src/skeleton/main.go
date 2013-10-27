@@ -113,46 +113,55 @@ func bootstrapOrchestrator(ip string) string {
 	return ip
 }
 
-// deploy pushes our new deploy configuration to the orchestrator
-func deploy(ip string, config *common.SkeletonDeployment, update string) {
-
-	log.Print("Pushing images to Orchestrator")
+//deploys the images to the orchestrator
+func deployImages(ip string, config *common.SkeletonDeployment) {
 	h := common.MakeHttpClient()
-
-	if update == "deploy" || update == "images" {
-		for k, _ := range config.Containers {
-			image := common.TarDir(k)
-			resp, err := h.Post("http://"+ip+":900/image?name="+k, "application/tar",
-				image)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer resp.Body.Close()
-			common.LogReader(resp.Body)
-		}
-	}
-
-	if update == "deploy" || update == "configuration"{
-		log.Print("Pushing configuration to Orchestrator")
-
-		barr, err := json.Marshal(config)
+	log.Print("Pushing images to Orchestrator")
+	for k, _ := range config.Containers {
+		image := common.TarDir(k)
+		resp, err := h.Post("http://"+ip+":900/image?name="+k, "application/tar",
+			image)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		b := bytes.NewBuffer(barr)
-
-		resp, err := h.Post("http://"+ip+":900/deploy", "application/json", b)
-		log.Print("Post returned")
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
 		defer resp.Body.Close()
 		common.LogReader(resp.Body)
 	}
+}
 
+//deploys the configuration to the orchestrator
+func deployConfig(ip string, config *common.SkeletonDeployment) {
+	h := common.MakeHttpClient()
+	log.Print("Pushing configuration to Orchestrator")
+
+	barr, err := json.Marshal(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b := bytes.NewBuffer(barr)
+
+	resp, err := h.Post("http://"+ip+":900/deploy", "application/json", b)
+	log.Print("Post returned")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer resp.Body.Close()
+	common.LogReader(resp.Body)
+}
+
+// deploy pushes our new deploy configuration to the orchestrator
+func deploy(ip string, config *common.SkeletonDeployment, update string) {
+	if update == "deploy"{
+		deployConfig(ip, config)
+		deployImages(ip, config)
+	} else if update == "push images"{
+		deployImages(ip, config)
+	} else if update == "push configuration"{
+		deployConfig(ip, config)
+	}
 	log.Print("Deploy Pushed")
 
 	return
@@ -181,13 +190,7 @@ func main() {
 			D.StopImage("orchestrator")
 			D.StopImage("gatekeeper")
 			orch = bootstrapOrchestrator(config.Machines.Ip[0])
-			if flag.Arg(0) == "deploy"{
-				deploy(orch, config, "deploy")
-			}else if flag.Arg(0)	== "push images"{
-				deploy(orch, config, "images")
-			}else if flag.Arg(0) == "push configuration"{
-				deploy(orch, config, "configuration")
-			}
+			deploy(orch, config, flag.Arg(0))
 		// Error contacting orchestrator
 		default:
 			log.Fatal(err)
