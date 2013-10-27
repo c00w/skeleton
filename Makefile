@@ -27,6 +27,13 @@ test/skeleton/hello/hello: test/skeleton/hello/hello.go
 test: all vagrant test/skeleton/hello/hello
 	GOPATH=$(CURDIR) go test skeleton gatekeeper orchestrator libgatekeeper common
 
+fmt:
+	go fmt src/skeleton/*.go
+	go fmt src/gatekeeper/*.go
+	go fmt src/orchestrator/*.go
+	go fmt src/libgatekeeper/*.go
+	go fmt src/common/*.go
+
 clean:
 	VAGRANT_CWD=$(CURDIR)/test vagrant destroy -f
 	rm bin/*

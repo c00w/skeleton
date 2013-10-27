@@ -3,8 +3,10 @@ package libgatekeeper
 import (
 	"common"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"strings"
 )
 
@@ -100,6 +102,35 @@ func (g *Client) AddAccess(item string, newkey string) (err error) {
 	if resp.StatusCode != 200 {
 		return errors.New("Status code is " + resp.Status)
 	}
+	return
+}
+
+func itoa(i int) (s string) {
+	s = fmt.Sprintf("%d", i)
+	return
+}
+
+func (g *Client) GetMember(key string) string {
+	values := make([]string, 1)
+	for i := 0; ; i++ {
+		v, err := g.Get(key + "." + itoa(i))
+		if err != nil {
+			break
+		}
+		values = append(values, v)
+	}
+	return values[rand.Int()%len(values)]
+}
+
+func (g *Client) AddMember(key string, infokey string) (err error) {
+	i := 0
+	for ; ; i++ {
+		_, err := g.Get(key + "." + itoa(i))
+		if err != nil {
+			break
+		}
+	}
+	err = g.New(infokey, key)
 	return
 }
 
