@@ -8,11 +8,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net"
 	"os"
 	"strings"
 	"time"
-	"crypto/tls"
 )
 
 type orchestrator struct {
@@ -286,28 +284,6 @@ func status(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "status page")
 }
 
-func listenAndServeOrchestratorTLS(d *http.ServeMux) error {
-    cert,key := common.GenerateCertificate(os.Getenv("Host"))
-    server := &http.Server{Addr: ":900", Handler: d}
-    config := &tls.Config{}
-    *config = *server.TLSConfig
-    if config.NextProtos == nil {
-        config.NextProtos = []string{"http/1.1"}
-    }
-    var err error
-    config.Certificates = make([]tls.Certificate, 1)
-    config.Certificates[0], err = tls.X509KeyPair(cert,key)
-    if err != nil {
-        return err
-       }
-    conn, err := net.Listen("tcp",server.Addr)
-    if err != nil {
-        return err
-    }
-    
-    tlsListener := tls.NewListener(conn,config)
-    return server.Serve(tlsListener)
-}
 func main() {
 
 	o := NewOrchestrator()
@@ -320,5 +296,5 @@ func main() {
 
 	http.HandleFunc("/deploy", o.deploy)
         
-	o.logger.Fatal(listenAndServeOrchestratorTLS(http.DefaultServeMux))
+	o.logger.Fatal(common.CustomListenAndServeTLS(http.DefaultServeMux))
 }

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"common"
 )
 
 type gatekeeper struct {
@@ -210,5 +211,5 @@ func main() {
 	http.HandleFunc("/permissions/", g.permission)
 
 	log.Print("starting gatekeeper")
-	log.Fatal(http.ListenAndServe(":800", nil))
+	log.Fatal(common.CustomListenAndServeTLS(http.DefaultServeMux))
 }

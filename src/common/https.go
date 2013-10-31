@@ -15,6 +15,9 @@ import (
 	"math/big"
 	"net"
 	"time"
+	"os"
+	"net/http"
+	"crypto/tls"
 )
 //fix and set all of these variables
 
@@ -57,4 +60,28 @@ func GenerateCertificate(host string) (key, certificate [] byte) {
 	certBlock := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	keyBlock := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 	return certBlock,keyBlock
+}
+
+
+func CustomListenAndServeTLS(d *http.ServeMux) error {
+    cert,key := GenerateCertificate(os.Getenv("Host"))
+    server := &http.Server{Addr: ":900", Handler: d}
+    config := &tls.Config{}
+    *config = *server.TLSConfig
+    if config.NextProtos == nil {
+        config.NextProtos = []string{"http/1.1"}
+    }
+    var err error
+    config.Certificates = make([]tls.Certificate, 1)
+    config.Certificates[0], err = tls.X509KeyPair(cert,key)
+    if err != nil {
+        return err
+       }
+    conn, err := net.Listen("tcp",server.Addr)
+    if err != nil {
+        return err
+    }
+    
+    tlsListener := tls.NewListener(conn,config)
+    return server.Serve(tlsListener)
 }
