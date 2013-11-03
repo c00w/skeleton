@@ -197,37 +197,85 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 	for container, _ := range desired.Containers {
 		// Assuming granularity machine
 
-		// For each machine check for container
-		for ip, mInfo := range current {
+		gran := container["granularity"]
+		quant := container["quantity"]
+		if gran == "machine" {
+			// For each machine check for container
+			for ip, mInfo := range current {
 
-			//Have we found the container
-			found := false
+				//Have we found the container
+				found := false
 
-			//Check if the container is running
-			for _, checkContainer := range mInfo.Containers {
+				//Check if the container is running
+				for _, checkContainer := range mInfo.Containers {
 
-				imageName := checkContainer.Image
+					imageName := checkContainer.Image
 
-				//Get the actual name
-				if strings.Contains(imageName, "/") {
-					imageName = strings.SplitN(imageName, "/", 2)[1]
-				}
-				if strings.Contains(imageName, ":") {
-					imageName = strings.SplitN(imageName, ":", 2)[0]
-				}
+					//Get the actual name
+					if strings.Contains(imageName, "/") {
+						imageName = strings.SplitN(imageName, "/", 2)[1]
+					}//slash if
+					if strings.Contains(imageName, ":") {
+						imageName = strings.SplitN(imageName, ":", 2)[0]
+					}//colon if
 
-				if imageName == container {
-					found = true
-					break
-				}
-			}
+					if imageName == container {
+						found = true
+						break
+					}//found if
+				}//check loop
 
-			//Do we need to deploy a image?
-			if !found {
-				update[ip] = append(update[ip], container)
-			}
+				//Do we need to deploy a image?
+				if !found {
+					for n := 0; n < quant; n++ {
+						update[ip] = append(update[ip], container)
+					}//update loop
+				}//not found if
+				else {
+					for n:= 0; n < quant-1; n++ {
+						update[ip] = append(update[ip], container)
+					}//update loop
+				}//found else
+			}//ip loop
+		}//machine gran if
+		else {
+			for n := 0; n < quant; n{
+				for ip, mInfo := range current {
+					if n != quant {
+						//Have we found the container
+						found := false
 
-		}
+						//Check if the container is running
+						for _, checkContainer := range mInfo.Containers {
+
+							imageName := checkContainer.Image
+
+							//Get the actual name
+							if strings.Contains(imageName, "/") {
+								imageName = strings.SplitN(imageName, "/", 2)[1]
+							}//slash if
+							if strings.Contains(imageName, ":") {
+								imageName = strings.SplitN(imageName, ":", 2)[0]
+							}//colon if
+
+							if imageName == container {
+								found = true
+								break
+							}//found if
+						}//check loop
+
+						//Do we need to deploy a image?
+						if !found || n >= len(desired)){
+							update[ip] = append(update[ip], container)
+							n++
+						}//not found if
+					}//quantity check if
+					else {
+						break
+					}//quantity over else
+				}//ip loop
+			}//quantity loop
+		}//deploy gran else
 	}
 
 	return update
