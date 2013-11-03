@@ -194,11 +194,11 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 	// Maps IP's to lists of containers to deploy
 	update = make(map[string][]string)
 	// For each container we want to deploy
-	for container, _ := range desired.Containers {
+	for container, s := range desired.Containers {
 		// Assuming granularity machine
 
-		gran := container["granularity"]
-		quant := container["quantity"]
+		gran := s.Granularity
+		quant := s.Quantity
 		if gran == "machine" {
 			// For each machine check for container
 			for ip, mInfo := range current {
@@ -230,16 +230,14 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 					for n := 0; n < quant; n++ {
 						update[ip] = append(update[ip], container)
 					}//update loop
-				}//not found if
-				else {
+				}else {
 					for n:= 0; n < quant-1; n++ {
 						update[ip] = append(update[ip], container)
 					}//update loop
 				}//found else
 			}//ip loop
-		}//machine gran if
-		else {
-			for n := 0; n < quant; n{
+		}else {
+			for n := 0; n < quant;{
 				for ip, mInfo := range current {
 					if n != quant {
 						//Have we found the container
@@ -265,12 +263,11 @@ func (o *orchestrator) calcUpdate(w io.Writer, desired common.SkeletonDeployment
 						}//check loop
 
 						//Do we need to deploy a image?
-						if !found || n >= len(desired)){
+						if !found || (n >= len(desired.Containers)){
 							update[ip] = append(update[ip], container)
 							n++
 						}//not found if
-					}//quantity check if
-					else {
+					}else {
 						break
 					}//quantity over else
 				}//ip loop
