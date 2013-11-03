@@ -123,7 +123,7 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 				o.logger.Print(err)
 				continue
 			}
-			C, err = Img.Run(o.D, nil)
+			C, err = Img.Run(o.D, nil, port)
 			if err != nil {
 				o.logger.Print(err)
 				continue
@@ -287,7 +287,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			C, err := Img.Run(D, env)
+			C, err := Img.Run(D, env, "")
 			if err != nil {
 				enc.SetError(err)
 				continue

@@ -15,6 +15,11 @@ import (
 	"time"
 )
 
+type PortBinding struct {
+	HostIp   string
+	HostPort string
+}
+
 type Docker struct {
 	h          *HttpAPI // contains ip string
 	Containers []*Container
@@ -31,8 +36,9 @@ type Container struct {
 			Tcp map[string]string
 		}
 	}
-	Volumes map[string]string
-	Binds   []string
+	Volumes      map[string]string
+	Binds        []string
+	PortBindings map[string][]PortBinding
 }
 
 type Image struct {
@@ -140,7 +146,7 @@ func (C *Container) Inspect() (err error) {
 }
 
 // runImage takes a docker image to run, and makes sure it is running
-func (Img *Image) Run(D *Docker, env []string) (C *Container, err error) {
+func (Img *Image) Run(D *Docker, env []string, port string) (C *Container, err error) {
 
 	c := make(map[string]interface{})
 	c["Image"] = Img.GetName()
@@ -184,11 +190,22 @@ func (Img *Image) Run(D *Docker, env []string) (C *Container, err error) {
 		return
 	}
 
+	if len(port) > 0 {
+		C.AddExposedPort(port)
+	}
+
 	C.AddBind("/mnt", "/foo")
 
 	err = C.Start()
 
 	return
+}
+
+func (C *Container) AddExposedPort(port string) {
+	if C.PortBindings == nil {
+		C.PortBindings = make(map[string][]PortBinding)
+	}
+	C.PortBindings[port] = append(C.PortBindings[port], PortBinding{"0.0.0.0", port})
 }
 
 func (C *Container) AddBind(host string, container string) {

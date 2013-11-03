@@ -117,7 +117,7 @@ func bootstrapOrchestrator(ip string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = Img.Run(D, buildEnv(D.GetIP()))
+	_, err = Img.Run(D, buildEnv(D.GetIP()), "900")
 	if err != nil {
 		log.Fatal(err)
 	}
