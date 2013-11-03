@@ -154,6 +154,11 @@ func (Img *Image) Run(D *Docker, env []string, port string) (C *Container, err e
 	v := make(map[string]struct{})
 	v["/foo"] = struct{}{}
 	c["Volumes"] = v
+	if len(port) > 0 {
+		p := make(map[string]struct{})
+		p[port] = struct{}{}
+		c["ExposedPorts"] = p
+	}
 
 	ba, err := json.Marshal(c)
 	if err != nil {
