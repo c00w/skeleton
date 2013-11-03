@@ -67,7 +67,9 @@ func CustomListenAndServeTLS(d *http.ServeMux) error {
     cert,key := GenerateCertificate(os.Getenv("Host"))
     server := &http.Server{Addr: ":900", Handler: d}
     config := &tls.Config{}
-    *config = *server.TLSConfig
+    if server.TLSConfig != nil {
+        *config = *server.TLSConfig
+    }
     if config.NextProtos == nil {
         config.NextProtos = []string{"http/1.1"}
     }
