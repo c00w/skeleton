@@ -210,7 +210,7 @@ func (C *Container) AddExposedPort(port string) {
 	if C.PortBindings == nil {
 		C.PortBindings = make(map[string][]PortBinding)
 	}
-	C.PortBindings[port] = append(C.PortBindings[port], PortBinding{"0.0.0.0", port})
+	C.PortBindings[port+"/tcp"] = append(C.PortBindings[port], PortBinding{"0.0.0.0", port})
 }
 
 func (C *Container) AddBind(host string, container string) {
