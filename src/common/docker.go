@@ -32,9 +32,7 @@ type Container struct {
 	Image           string
 	D               *Docker
 	NetworkSettings struct {
-		PortMapping struct {
-			Tcp map[string]string
-		}
+		Ports map[string][]map[string]string
 	}
 	Volumes      map[string]string
 	Binds        []string

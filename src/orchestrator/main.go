@@ -138,7 +138,7 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 		o.logger.Print(err)
 	}
 	o.logger.Print(registryName + " fetched config")
-	_ = C.NetworkSettings.PortMapping.Tcp[port]
+	port = C.NetworkSettings.Ports[port+"/tcp"][0]["HostPort"]
 
 	host := o.D.GetIP() + ":" + port
 
@@ -287,7 +287,7 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			C, err := Img.Run(D, env, "")
+			C, err := Img.Run(D, env, "80")
 			if err != nil {
 				enc.SetError(err)
 				continue
