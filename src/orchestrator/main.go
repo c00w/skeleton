@@ -287,7 +287,12 @@ func (o *orchestrator) deploy(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			C, err := Img.Run(D, env, "80")
+			expose_port := ""
+			if len(d.Containers[container].Expose) > 0 {
+				expose_port = d.Containers[container].Expose[0]
+			}
+
+			C, err := Img.Run(D, env, expose_port)
 			if err != nil {
 				enc.SetError(err)
 				continue

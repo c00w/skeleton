@@ -11,7 +11,8 @@
     "containers": {
         "hello": {
             "quantity" : 1,
-            "granularity" : "machine"
+            "granularity" : "machine",
+            "expose" : ["80"]
         }
     }
 }
