@@ -138,7 +138,7 @@ func (o *orchestrator) startImage(registryName string, portchan chan string, por
 		o.logger.Print(err)
 	}
 	o.logger.Print(registryName + " fetched config")
-	port = C.NetworkSettings.PortMapping.Tcp[port]
+	_ = C.NetworkSettings.PortMapping.Tcp[port]
 
 	host := o.D.GetIP() + ":" + port
 
