@@ -7,8 +7,10 @@ type SkeletonDeployment struct {
 	}
 
 	Containers map[string]struct {
+		Source      string
 		Quantity    int
 		Mode        string
 		Granularity string
+		Expose      []string
 	}
 }

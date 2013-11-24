@@ -10,7 +10,7 @@ bin/skeleton: src/skeleton/*.go src/common/*.go
 	rm -f bin/skeleton
 	GOPATH=$(CURDIR) go install skeleton
 
-bin/gatekeeper: src/gatekeeper/*.go src/common/*.go
+bin/gatekeeper: src/gatekeeper/*.go src/common/*.go src/libgatekeeper/*.go
 	rm -f bin/gatekeeper
 	GOPATH=$(CURDIR) go install gatekeeper
 
@@ -25,7 +25,7 @@ test/skeleton/hello/hello: test/skeleton/hello/hello.go
 	cd test/skeleton/hello/ && go build
 
 test: all vagrant test/skeleton/hello/hello
-	GOPATH=$(CURDIR) go test skeleton gatekeeper orchestrator
+	GOPATH=$(CURDIR) go test skeleton gatekeeper orchestrator libgatekeeper common
 
 clean:
 	VAGRANT_CWD=$(CURDIR)/test vagrant destroy -f
