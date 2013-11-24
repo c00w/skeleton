@@ -56,7 +56,7 @@ func TestBonesLoading(t *testing.T) {
                 "192.168.22.34", "192.168.22.35"}
 
         for _, address := range a {
-                resp, err := http.Get("http://" + address)
+                resp, err := http.Get("https://" + address)
                 if err != nil {
                         t.Error(err.Error())
                         continue

@@ -33,7 +33,7 @@ func GenerateCertificate(host string) (key, certificate [] byte) {
 	template := x509.Certificate{
 		SerialNumber: new(big.Int).SetInt64(0),
 		Subject: pkix.Name{
-			Organization: []string{"Acme Co"},
+			Organization: []string{"Skeleton"},
 		},
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
@@ -64,7 +64,9 @@ func GenerateCertificate(host string) (key, certificate [] byte) {
 
 
 func CustomListenAndServeTLS(d *http.ServeMux) error {
-    cert,key := GenerateCertificate(os.Getenv("Host"))
+    log.Print("Host:")
+    log.Print(os.Getenv("HOST"))
+    cert,key := GenerateCertificate(os.Getenv("HOST"))
     server := &http.Server{Addr: ":900", Handler: d}
     config := &tls.Config{}
     if server.TLSConfig != nil {

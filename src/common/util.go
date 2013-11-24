@@ -8,13 +8,17 @@ import (
 	"net/http"
 	"os"
 	"strings"
+    "crypto/tls"
 )
 
 var hc *http.Client = nil
 
 func MakeHttpClient() *http.Client {
 	if hc == nil {
-		hc = &http.Client{}
+        tr := &http.Transport{
+            TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+        }
+		hc = &http.Client{Transport: tr}
 	}
 	return hc
 }

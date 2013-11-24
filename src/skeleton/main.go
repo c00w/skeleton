@@ -78,15 +78,17 @@ func findOrchestrator(config *common.SkeletonDeployment) (string, error) {
 	for _, v := range config.Machines.Ip {
 		_, err := net.DialTimeout("tcp", v+":900", 1000*time.Millisecond)
 		if err != nil {
+            log.Print(err)
 			continue
 		}
-		_, err = client.Get("http://" + v + ":900/version")
+        err = nil
+		_, err = client.Get("https://" + v + ":900/version")
 		if err == nil {
 			log.Print("Orchestrator Found")
 			return v, nil
 		}
+        log.Print(err)
 	}
-
 	log.Print("No Orchestrator Found")
 	return "", new(NoOrchestratorFound)
 }
@@ -139,7 +141,7 @@ func deployImages(ip string, config *common.SkeletonDeployment) (err error) {
 		} else {
 			log.Fatal(source)
 		}
-		resp, err = h.Post("http://"+ip+":900/image?name="+k, "application/tar",
+		resp, err = h.Post("https://"+ip+":900/image?name="+k, "application/tar",
 			image)
 		if err != nil {
 			return
@@ -165,7 +167,7 @@ func deployConfig(ip string, config *common.SkeletonDeployment) (err error) {
 
 	b := bytes.NewBuffer(barr)
 
-	resp, err := h.Post("http://"+ip+":900/deploy", "application/json", b)
+	resp, err := h.Post("https://"+ip+":900/deploy", "application/json", b)
 	log.Print("Post returned")
 
 	if err != nil {
